@@ -1,60 +1,164 @@
 import express from 'express';
-import { hash, compare } from 'bcryptjs';
-import { sign } from 'jsonwebtoken';
-import User, { findOne } from '../models/User';
+import authService from '../services/authService.js';
+import { authenticate, rateLimitAuth } from '../middleware/auth.js';
 
-// Register endpoint
+const router = express.Router();
+
+router.use(rateLimitAuth());
+
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const result = await authService.register(req.body);
     
-    // Check if user exists
-    const existingUser = await findOne({ 
-      $or: [{ email }, { phone }] 
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully. Please check your email for verification.',
+      token: result.token,
+      user: result.user
     });
-    
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+  } catch (error) {
+    if (error.details) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Validation failed',
+        details: error.details 
+      });
     }
     
-    // Hash password
-    const hashedPassword = await hash(password, 12);
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email or phone already exists'
+      });
+    }
     
-    // Create user
-    const user = new User({
-      name, email, phone, password: hashedPassword
+    res.status(400).json({ 
+      success: false,
+      error: error.message 
     });
-    
-    await user.save();
-    
-    // Generate token
-    const token = sign({ userId: user._id }, process.env.JWT_SECRET);
-    
-    res.status(201).json({ token, user: { id: user._id, name, email } });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 
-// Login endpoint
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    const user = await findOne({ email });
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Email and password are required' 
+      });
     }
     
-    const isMatch = await compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
+    const result = await authService.login(email, password);
     
-    const token = sign({ userId: user._id }, process.env.JWT_SECRET);
-    
-    res.json({ token, user: { id: user._id, name: user.name, email } });
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token: result.token,
+      user: result.user
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(400).json({ 
+      success: false,
+      error: error.message 
+    });
   }
 });
+
+router.get('/verify-email/:token', async (req, res) => {
+  try {
+    const result = await authService.verifyEmail(req.params.token);
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    res.status(400).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Email is required' 
+      });
+    }
+    
+    const result = await authService.requestPasswordReset(email);
+    
+    res.json({
+      success: true,
+      message: result.message
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+});
+
+router.post('/reset-password/:token', async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Password is required' 
+      });
+    }
+    
+    const result = await authService.resetPassword(req.params.token, password);
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    res.status(400).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+router.get('/profile', authenticate, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Profile retrieved successfully',
+    user: req.user
+  });
+});
+
+router.post('/refresh-token', authenticate, (req, res) => {
+  try {
+    const newToken = authService.generateToken(req.user.id);
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      token: newToken
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to refresh token' 
+    });
+  }
+});
+
+router.post('/logout', authenticate, (req, res) => {
+  res.json({ 
+    success: true,
+    message: 'Logged out successfully' 
+  });
+});
+
+export default router;
