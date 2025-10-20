@@ -108,3 +108,41 @@ public/uploads/
 *.pem
 *.key
 *.crt
+
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo
+.expo/
+.expo-shared/
+
+# Node
+node_modules/
+
+# MacOS
+.DS_Store
+
+# Build outputs
+web-build/
+dist/
+
+
+# iOS
+ios/Pods/
+ios/build/
+*.xcodeproj
+*.xcworkspace
+*.xcuserdata
+*.xcscheme
+
+# Android
+android/.gradle/
+android/build/
+
+
+# Misc
+*.swp
+
