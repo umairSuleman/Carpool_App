@@ -1,10 +1,12 @@
-import { sign, verify } from 'jsonwebtoken';
 import crypto from 'crypto';
+import { Op } from 'sequelize';
+import { generateToken, verifyToken } from '../utils/jwtUtils.js'; 
 import { User, UserProfile } from '../models/associations.js';
 import { validateRegistrationData, validatePassword } from '../utils/validation.js';
-import { Op } from 'sequelize';
+
 
 class AuthService {
+
   // Register new user
   async register(userData) {
     const validation = validateRegistrationData(userData);
@@ -49,7 +51,8 @@ class AuthService {
         phone,
         password_hash: passwordHash,
         email_verification_token: emailVerificationToken,
-        email_verification_expires: emailVerificationExpires
+        email_verification_expires: emailVerificationExpires,
+        //is_verified: true  for testing purposes
       }, { transaction });
       
       // Create user profile
@@ -59,8 +62,7 @@ class AuthService {
       
       await transaction.commit();
       
-      // Generate JWT token
-      const token = this.generateToken(user.id);
+      const token = generateToken(user.id);         //modular fucntion used 
       
       return {
         token,
@@ -68,7 +70,10 @@ class AuthService {
         emailVerificationToken
       };
     } catch (error) {
-      await transaction.rollback();
+      // Only rollback if transaction hasn't been finalized
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
       throw error;
     }
   }
@@ -81,7 +86,7 @@ class AuthService {
       throw new Error('Please verify your email before logging in');
     }
     
-    const token = this.generateToken(user.id);
+    const token = generateToken(user.id);           //modular func used
     
     return {
       token,
@@ -181,21 +186,9 @@ class AuthService {
     
     return user ? user.toSafeJSON() : null;
   }
-
-  // Generate JWT token
-  generateToken(userId) {
-    return sign(
-      { userId }, 
-      process.env.JWT_SECRET, 
-      { 
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-        issuer: 'carpooling-app'
-      }
-    );
-  }
-
-  // Verify JWT token
-  verifyToken(token) {
-    return verify(token, process.env.JWT_SECRET);
-  }
+  //re-exposing the modularised funcs as props on the service instance
+  generateToken = generateToken;
+  verifyToken = verifyToken;        //modular func used
 }
+
+export default new AuthService();
