@@ -1,4 +1,4 @@
-import authService from '../services/authService.js';
+import AuthService from '../services/authService.js';
 
 export const authenticate = async (req, res, next) => {
     try {
@@ -12,9 +12,9 @@ export const authenticate = async (req, res, next) => {
         }
         
         const token = authHeader.replace('Bearer ', '');
-        const decoded = authService.verifyToken(token);
+        const decoded = AuthService.verifyToken(token);
         
-        const user = await authService.findUserById(decoded.userId);
+        const user = await AuthService.findUserById(decoded.userId);
         if (!user) {
         return res.status(401).json({ 
             success: false,
