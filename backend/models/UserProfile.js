@@ -64,8 +64,8 @@ UserProfile.init({
         defaultValue: null,     //changed from 5.0 to null
         allowNull: true,        //allow null for new users
         validate: {
-        min: { args: 0, msg: 'Rating cannot be less than 0' },
-        max: { args: 5, msg: 'Rating cannot be more than 5' }
+        min: { args: '0', msg: 'Rating cannot be less than 0' },
+        max: { args: '5', msg: 'Rating cannot be more than 5' }
         }
     },
     total_rides: {

@@ -40,7 +40,7 @@ Wallet.init({
     defaultValue: 0.00,
     allowNull: false,
     validate: {
-      min: { args: 0, msg: 'Balance cannot be negative' }
+      min: { args: '0', msg: 'Balance cannot be negative' }
     }
   },
   currency: {
