@@ -61,7 +61,8 @@ UserProfile.init({
     },
     rating: {
         type: DataTypes.DECIMAL(2, 1),
-        defaultValue: 5.0,
+        defaultValue: null,     //changed from 5.0 to null
+        allowNull: true,        //allow null for new users
         validate: {
         min: { args: 0, msg: 'Rating cannot be less than 0' },
         max: { args: 5, msg: 'Rating cannot be more than 5' }
@@ -80,3 +81,5 @@ UserProfile.init({
         { fields: ['user_id'] }
     ]
 });
+
+export default UserProfile;
