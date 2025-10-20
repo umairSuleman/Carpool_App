@@ -1,6 +1,7 @@
 import { DataTypes, Model } from 'sequelize';
 import { hash, compare } from 'bcryptjs';
 import sequelize from '../config/database.js';
+import UserProfile from './UserProfile.js';
 
 class User extends Model {
   // Instance methods
@@ -207,3 +208,5 @@ User.init({
     { fields: ['created_at'] }
   ]
 });
+
+export default User;
