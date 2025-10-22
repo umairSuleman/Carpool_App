@@ -7,6 +7,7 @@ import sequelize from './config/database.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
+import profileRoutes from './routes/profile.js';
 // Import other routes as you create them
 
 // Load environment variables
@@ -52,8 +53,8 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', profileRoutes);
 // Add more routes as you create them:
-// app.use('/api/profile', profileRoutes);
 // app.use('/api/driver', driverRoutes);
 // app.use('/api/rides', rideRoutes);
 // app.use('/api/bookings', bookingRoutes);
