@@ -52,7 +52,7 @@ class AuthService {
         password_hash: passwordHash,
         email_verification_token: emailVerificationToken,
         email_verification_expires: emailVerificationExpires,
-        //is_verified: true  for testing purposes
+        is_verified: true  //for testing purposes
       }, { transaction });
       
       // Create user profile
