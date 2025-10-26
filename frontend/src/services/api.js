@@ -1,6 +1,10 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+import config from '../constants/config';
+
+const API_BASE_URL = config.API_URL;
 
 const getAuthToken = async () => {
+  // In a real app, you'd get this from AsyncStorage
+  // For now, we'll get it from the auth context
   return null;
 };
 
@@ -8,14 +12,17 @@ const handleResponse = async (response) => {
   const data = await response.json();
   
   if (!response.ok) {
-    throw new Error(data.error || 'Request failed');
+    throw new Error(data.error || data.message || 'Request failed');
   }
   
   return data;
 };
 
 const api = {
-  // Auth endpoints
+  // ============================================
+  // AUTH ENDPOINTS
+  // ============================================
+  
   register: async (userData) => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -23,7 +30,13 @@ const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(userData),
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+          password: userData.password,
+          confirmPassword: userData.confirmPassword
+        }),
       });
       return await handleResponse(response);
     } catch (error) {
@@ -46,18 +59,14 @@ const api = {
     }
   },
 
-  verifyOTP: async (otp, phone) => {
+  verifyEmail: async (token) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ otp, phone }),
+      const response = await fetch(`${API_BASE_URL}/auth/verify-email/${token}`, {
+        method: 'GET',
       });
       return await handleResponse(response);
     } catch (error) {
-      throw new Error(error.message || 'OTP verification failed');
+      throw new Error(error.message || 'Email verification failed');
     }
   },
 
@@ -91,10 +100,40 @@ const api = {
     }
   },
 
-  // Profile endpoints
-  getProfile: async () => {
+  refreshToken: async (token) => {
     try {
-      const token = await getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      throw new Error(error.message || 'Token refresh failed');
+    }
+  },
+
+  logout: async (token) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      throw new Error(error.message || 'Logout failed');
+    }
+  },
+
+  // ============================================
+  // PROFILE ENDPOINTS
+  // ============================================
+  
+  getProfile: async (token) => {
+    try {
       const response = await fetch(`${API_BASE_URL}/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -106,9 +145,8 @@ const api = {
     }
   },
 
-  updateProfile: async (data) => {
+  updateProfile: async (token, data) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/profile`, {
         method: 'PUT',
         headers: {
@@ -123,9 +161,8 @@ const api = {
     }
   },
 
-  uploadProfilePhoto: async (photoUrl) => {
+  uploadProfilePhoto: async (token, photoUrl) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/profile/photo`, {
         method: 'POST',
         headers: {
@@ -140,10 +177,25 @@ const api = {
     }
   },
 
-  // Ride endpoints
-  searchRides: async (source, destination, date) => {
+  getUserProfile: async (token, userId) => {
     try {
-      const token = await getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/profile/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      throw new Error(error.message || 'Failed to fetch user profile');
+    }
+  },
+
+  // ============================================
+  // RIDE ENDPOINTS (Placeholder - needs backend implementation)
+  // ============================================
+  
+  searchRides: async (token, source, destination, date) => {
+    try {
       const params = new URLSearchParams({
         origin: source,
         destination: destination,
@@ -161,9 +213,8 @@ const api = {
     }
   },
 
-  createRide: async (rideData) => {
+  createRide: async (token, rideData) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/rides`, {
         method: 'POST',
         headers: {
@@ -178,9 +229,8 @@ const api = {
     }
   },
 
-  getUserRides: async () => {
+  getUserRides: async (token) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/rides/my-rides`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -192,10 +242,12 @@ const api = {
     }
   },
 
-  // Booking endpoints
-  createBooking: async (bookingData) => {
+  // ============================================
+  // BOOKING ENDPOINTS (Placeholder - needs backend implementation)
+  // ============================================
+  
+  createBooking: async (token, bookingData) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: {
@@ -210,9 +262,8 @@ const api = {
     }
   },
 
-  getUserBookings: async () => {
+  getUserBookings: async (token) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/bookings/my-bookings`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -224,9 +275,8 @@ const api = {
     }
   },
 
-  cancelBooking: async (bookingId) => {
+  cancelBooking: async (token, bookingId) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel`, {
         method: 'POST',
         headers: {
@@ -239,10 +289,12 @@ const api = {
     }
   },
 
-  // Wallet endpoints
-  getWalletBalance: async () => {
+  // ============================================
+  // WALLET ENDPOINTS (Placeholder - needs backend implementation)
+  // ============================================
+  
+  getWalletBalance: async (token) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/wallet/balance`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -254,9 +306,8 @@ const api = {
     }
   },
 
-  getTransactions: async () => {
+  getTransactions: async (token) => {
     try {
-      const token = await getAuthToken();
       const response = await fetch(`${API_BASE_URL}/wallet/transactions`, {
         headers: {
           Authorization: `Bearer ${token}`,

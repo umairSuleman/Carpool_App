@@ -1,5 +1,10 @@
 export default {
-  API_URL: 'http://localhost:5000/api',
+  // IMPORTANT: Update this to your backend URL
+  // For local development with your machine's IP
+  API_URL: 'http://192.168.56.1:5000/api', // Replace with your actual IP
+  // Alternative for Android emulator: 'http://10.0.2.2:5000/api'
+  // Alternative for local network: 'http://YOUR_IP_ADDRESS:5000/api'
+  
   API_TIMEOUT: 30000,
   
   // App info

@@ -9,7 +9,6 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-// import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -84,7 +83,7 @@ const RegisterScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Icon name="account-plus" size={60} color="#10b981" />
+          <Text style={styles.logo}>👤➕</Text>
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Join the carpool community</Text>
         </View>
@@ -94,7 +93,7 @@ const RegisterScreen = ({ navigation }) => {
             placeholder="Full Name"
             value={formData.name}
             onChangeText={(value) => updateField('name', value)}
-            leftIcon={<Icon name="account" size={20} color="#6b7280" />}
+            leftIcon={<Text style={styles.inputIcon}>👤</Text>}
           />
 
           <Input
@@ -103,7 +102,7 @@ const RegisterScreen = ({ navigation }) => {
             onChangeText={(value) => updateField('email', value)}
             keyboardType="email-address"
             autoCapitalize="none"
-            leftIcon={<Icon name="email" size={20} color="#6b7280" />}
+            leftIcon={<Text style={styles.inputIcon}>📧</Text>}
           />
 
           <Input
@@ -111,7 +110,7 @@ const RegisterScreen = ({ navigation }) => {
             value={formData.phone}
             onChangeText={(value) => updateField('phone', value)}
             keyboardType="phone-pad"
-            leftIcon={<Icon name="phone" size={20} color="#6b7280" />}
+            leftIcon={<Text style={styles.inputIcon}>📱</Text>}
           />
 
           <Input
@@ -119,14 +118,10 @@ const RegisterScreen = ({ navigation }) => {
             value={formData.password}
             onChangeText={(value) => updateField('password', value)}
             secureTextEntry={!showPassword}
-            leftIcon={<Icon name="lock" size={20} color="#6b7280" />}
+            leftIcon={<Text style={styles.inputIcon}>🔒</Text>}
             rightIcon={
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Icon
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color="#6b7280"
-                />
+                <Text style={styles.inputIcon}>{showPassword ? '👁️' : '🙈'}</Text>
               </TouchableOpacity>
             }
           />
@@ -136,14 +131,10 @@ const RegisterScreen = ({ navigation }) => {
             value={formData.confirmPassword}
             onChangeText={(value) => updateField('confirmPassword', value)}
             secureTextEntry={!showConfirmPassword}
-            leftIcon={<Icon name="lock-check" size={20} color="#6b7280" />}
+            leftIcon={<Text style={styles.inputIcon}>🔐</Text>}
             rightIcon={
               <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                <Icon
-                  name={showConfirmPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color="#6b7280"
-                />
+                <Text style={styles.inputIcon}>{showConfirmPassword ? '👁️' : '🙈'}</Text>
               </TouchableOpacity>
             }
           />
@@ -185,6 +176,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
+  logo: {
+    fontSize: 60,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -198,6 +192,9 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  inputIcon: {
+    fontSize: 20,
   },
   registerButton: {
     marginTop: 24,

@@ -7,17 +7,16 @@ import {
   TouchableOpacity,
   TextInput
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const HomeScreen = ({ navigation }) => {
   const [source, setSource] = useState('');
   const [destination, setDestination] = useState('');
 
   const quickActions = [
-    { icon: 'magnify', label: 'Find Ride', color: '#10b981', action: 'Search' },
-    { icon: 'car-plus', label: 'Offer Ride', color: '#3b82f6', action: 'Offer' },
-    { icon: 'calendar', label: 'My Bookings', action: 'Bookings' },
-    { icon: 'history', label: 'Ride History', color: '#8b5cf6', action: 'History' },
+    { icon: '🔍', label: 'Find Ride', color: '#10b981', action: 'Search' },
+    { icon: '🚗➕', label: 'Offer Ride', color: '#3b82f6', action: 'Offer' },
+    { icon: '📅', label: 'My Bookings', color: '#f59e0b', action: 'Bookings' },
+    { icon: '📜', label: 'Ride History', color: '#8b5cf6', action: 'History' },
   ];
 
   const recentRides = [
@@ -54,29 +53,31 @@ const HomeScreen = ({ navigation }) => {
 
       <View style={styles.searchCard}>
         <View style={styles.searchInput}>
-          <Icon name="map-marker" size={20} color="#10b981" />
+          <Text style={styles.locationIcon}>📍</Text>
           <TextInput
             style={styles.input}
             placeholder="Pickup location"
             value={source}
             onChangeText={setSource}
+            placeholderTextColor="#9ca3af"
           />
         </View>
         
         <View style={styles.searchDivider} />
         
         <View style={styles.searchInput}>
-          <Icon name="map-marker-check" size={20} color="#ef4444" />
+          <Text style={styles.locationIcon}>🎯</Text>
           <TextInput
             style={styles.input}
             placeholder="Drop-off location"
             value={destination}
             onChangeText={setDestination}
+            placeholderTextColor="#9ca3af"
           />
         </View>
 
         <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-          <Icon name="magnify" size={20} color="#fff" />
+          <Text style={styles.searchIcon}>🔍</Text>
           <Text style={styles.searchButtonText}>Search Rides</Text>
         </TouchableOpacity>
       </View>
@@ -91,7 +92,7 @@ const HomeScreen = ({ navigation }) => {
               onPress={() => navigation.navigate(action.action)}
             >
               <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
-                <Icon name={action.icon} size={28} color={action.color} />
+                <Text style={styles.actionEmoji}>{action.icon}</Text>
               </View>
               <Text style={styles.actionLabel}>{action.label}</Text>
             </TouchableOpacity>
@@ -117,7 +118,7 @@ const HomeScreen = ({ navigation }) => {
                 <View>
                   <Text style={styles.driverName}>{ride.driver}</Text>
                   <View style={styles.ratingRow}>
-                    <Icon name="star" size={14} color="#fbbf24" />
+                    <Text style={styles.star}>⭐</Text>
                     <Text style={styles.ratingText}>{ride.rating}</Text>
                   </View>
                 </View>
@@ -127,12 +128,12 @@ const HomeScreen = ({ navigation }) => {
 
             <View style={styles.rideRoute}>
               <View style={styles.locationRow}>
-                <Icon name="circle" size={10} color="#10b981" />
+                <Text style={styles.dot}>🟢</Text>
                 <Text style={styles.locationText}>{ride.from}</Text>
               </View>
               <View style={styles.routeLine} />
               <View style={styles.locationRow}>
-                <Icon name="circle" size={10} color="#ef4444" />
+                <Text style={styles.dot}>🔴</Text>
                 <Text style={styles.locationText}>{ride.to}</Text>
               </View>
             </View>
@@ -181,9 +182,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
   },
+  locationIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
   input: {
     flex: 1,
-    marginLeft: 12,
     fontSize: 16,
     color: '#1f2937',
   },
@@ -201,11 +205,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
   },
+  searchIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
   searchButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
   quickActionsContainer: {
     padding: 16,
@@ -241,6 +248,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  actionEmoji: {
+    fontSize: 28,
   },
   actionLabel: {
     fontSize: 14,
@@ -307,6 +317,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  star: {
+    fontSize: 14,
+  },
   ratingText: {
     fontSize: 12,
     color: '#6b7280',
@@ -324,6 +337,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 2,
+  },
+  dot: {
+    fontSize: 10,
   },
   locationText: {
     fontSize: 14,

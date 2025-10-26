@@ -1,347 +1,216 @@
-// import React, { useState } from 'react';
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   ScrollView,
-//   TouchableOpacity,
-//   TextInput
-// } from 'react-native';
-// import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert
+} from 'react-native';
+import { useAuth } from '../../hooks/useAuth';
+import colors from '../../constants/colors';
 
-// const HomeScreen = ({ navigation }) => {
-//   const [source, setSource] = useState('');
-//   const [destination, setDestination] = useState('');
+const ProfileScreen = ({ navigation }) => {
+  const { user, logout } = useAuth();
 
-//   const quickActions = [
-//     { icon: 'magnify', label: 'Find Ride', color: '#10b981', action: 'Search' },
-//     { icon: 'car-plus', label: 'Offer Ride', color: '#3b82f6', action: 'Offer' },
-//     { icon: 'calendar', label: 'My Bookings', action: 'Bookings' },
-//     { icon: 'history', label: 'Ride History', color: '#8b5cf6', action: 'History' },
-//   ];
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: () => logout()
+        }
+      ]
+    );
+  };
 
-//   const recentRides = [
-//     {
-//       id: '1',
-//       from: 'Koramangala',
-//       to: 'Whitefield',
-//       date: 'Today, 6:30 PM',
-//       price: '₹150',
-//       driver: 'Rajesh Kumar',
-//       rating: 4.8,
-//     },
-//     {
-//       id: '2',
-//       from: 'Indiranagar',
-//       to: 'Electronic City',
-//       date: 'Today, 7:00 PM',
-//       price: '₹200',
-//       driver: 'Priya Sharma',
-//       rating: 4.9,
-//     },
-//   ];
+  const menuItems = [
+    { id: 1, title: 'Edit Profile', icon: '👤' },
+    { id: 2, title: 'My Vehicles', icon: '🚗' },
+    { id: 3, title: 'Payment Methods', icon: '💳' },
+    { id: 4, title: 'Ride History', icon: '📜' },
+    { id: 5, title: 'Settings', icon: '⚙️' },
+    { id: 6, title: 'Help & Support', icon: '❓' },
+  ];
 
-//   const handleSearch = () => {
-//     navigation.navigate('SearchRides', { source, destination });
-//   };
-
-//   return (
-//     <ScrollView style={styles.container}>
-//       <View style={styles.header}>
-//         <Text style={styles.greeting}>Welcome back! 👋</Text>
-//         <Text style={styles.subtitle}>Where do you want to go?</Text>
-//       </View>
-
-//       <View style={styles.searchCard}>
-//         <View style={styles.searchInput}>
-//           <Icon name="map-marker" size={20} color="#10b981" />
-//           <TextInput
-//             style={styles.input}
-//             placeholder="Pickup location"
-//             value={source}
-//             onChangeText={setSource}
-//           />
-//         </View>
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.name}>{user?.name || 'User'}</Text>
+        <Text style={styles.email}>{user?.email || 'user@example.com'}</Text>
         
-//         <View style={styles.searchDivider} />
-        
-//         <View style={styles.searchInput}>
-//           <Icon name="map-marker-check" size={20} color="#ef4444" />
-//           <TextInput
-//             style={styles.input}
-//             placeholder="Drop-off location"
-//             value={destination}
-//             onChangeText={setDestination}
-//           />
-//         </View>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statLabel}>Rides</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>5.0</Text>
+            <Text style={styles.statLabel}>Rating</Text>
+          </View>
+        </View>
+      </View>
 
-//         <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-//           <Icon name="magnify" size={20} color="#fff" />
-//           <Text style={styles.searchButtonText}>Search Rides</Text>
-//         </TouchableOpacity>
-//       </View>
+      <View style={styles.menuContainer}>
+        {menuItems.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.menuItem}
+            onPress={() => Alert.alert(item.title, 'Coming soon!')}
+          >
+            <View style={styles.menuLeft}>
+              <Text style={styles.menuIcon}>{item.icon}</Text>
+              <Text style={styles.menuTitle}>{item.title}</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-//       <View style={styles.quickActionsContainer}>
-//         <Text style={styles.sectionTitle}>Quick Actions</Text>
-//         <View style={styles.quickActions}>
-//           {quickActions.map((action, index) => (
-//             <TouchableOpacity
-//               key={index}
-//               style={styles.actionCard}
-//               onPress={() => navigation.navigate(action.action)}
-//             >
-//               <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
-//                 <Icon name={action.icon} size={28} color={action.color} />
-//               </View>
-//               <Text style={styles.actionLabel}>{action.label}</Text>
-//             </TouchableOpacity>
-//           ))}
-//         </View>
-//       </View>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
 
-//       <View style={styles.recentRidesContainer}>
-//         <View style={styles.sectionHeader}>
-//           <Text style={styles.sectionTitle}>Available Rides</Text>
-//           <TouchableOpacity>
-//             <Text style={styles.seeAll}>See All</Text>
-//           </TouchableOpacity>
-//         </View>
+      <Text style={styles.version}>Version 1.0.0</Text>
+    </ScrollView>
+  );
+};
 
-//         {recentRides.map((ride) => (
-//           <TouchableOpacity key={ride.id} style={styles.rideCard}>
-//             <View style={styles.rideHeader}>
-//               <View style={styles.driverInfo}>
-//                 <View style={styles.avatar}>
-//                   <Text style={styles.avatarText}>{ride.driver.charAt(0)}</Text>
-//                 </View>
-//                 <View>
-//                   <Text style={styles.driverName}>{ride.driver}</Text>
-//                   <View style={styles.ratingRow}>
-//                     <Icon name="star" size={14} color="#fbbf24" />
-//                     <Text style={styles.ratingText}>{ride.rating}</Text>
-//                   </View>
-//                 </View>
-//               </View>
-//               <Text style={styles.price}>{ride.price}</Text>
-//             </View>
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    backgroundColor: colors.primary,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primaryDark,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.textLight,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.textLight,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.textLight,
+    marginBottom: 4,
+  },
+  email: {
+    fontSize: 14,
+    color: colors.textLight,
+    opacity: 0.9,
+    marginBottom: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textLight,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textLight,
+    opacity: 0.8,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  menuContainer: {
+    backgroundColor: colors.surface,
+    marginTop: 20,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  menuLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuIcon: {
+    fontSize: 24,
+    marginRight: 16,
+  },
+  menuTitle: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  menuArrow: {
+    fontSize: 24,
+    color: colors.textSecondary,
+  },
+  logoutButton: {
+    backgroundColor: colors.error,
+    marginHorizontal: 16,
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: colors.textLight,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  version: {
+    textAlign: 'center',
+    color: colors.textTertiary,
+    fontSize: 12,
+    marginVertical: 20,
+  },
+});
 
-//             <View style={styles.rideRoute}>
-//               <View style={styles.locationRow}>
-//                 <Icon name="circle" size={10} color="#10b981" />
-//                 <Text style={styles.locationText}>{ride.from}</Text>
-//               </View>
-//               <View style={styles.routeLine} />
-//               <View style={styles.locationRow}>
-//                 <Icon name="circle" size={10} color="#ef4444" />
-//                 <Text style={styles.locationText}>{ride.to}</Text>
-//               </View>
-//             </View>
-
-//             <Text style={styles.rideTime}>{ride.date}</Text>
-//           </TouchableOpacity>
-//         ))}
-//       </View>
-//     </ScrollView>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#f9fafb',
-//   },
-//   header: {
-//     padding: 20,
-//     backgroundColor: '#10b981',
-//   },
-//   greeting: {
-//     fontSize: 24,
-//     fontWeight: 'bold',
-//     color: '#fff',
-//   },
-//   subtitle: {
-//     fontSize: 14,
-//     color: '#dcfce7',
-//     marginTop: 4,
-//   },
-//   searchCard: {
-//     backgroundColor: '#fff',
-//     margin: 16,
-//     marginTop: -30,
-//     borderRadius: 16,
-//     padding: 16,
-//     shadowColor: '#000',
-//     shadowOffset: { width: 0, height: 4 },
-//     shadowOpacity: 0.1,
-//     shadowRadius: 8,
-//     elevation: 5,
-//   },
-//   searchInput: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     paddingVertical: 12,
-//   },
-//   input: {
-//     flex: 1,
-//     marginLeft: 12,
-//     fontSize: 16,
-//     color: '#1f2937',
-//   },
-//   searchDivider: {
-//     height: 1,
-//     backgroundColor: '#f3f4f6',
-//     marginVertical: 8,
-//   },
-//   searchButton: {
-//     flexDirection: 'row',
-//     backgroundColor: '#10b981',
-//     padding: 16,
-//     borderRadius: 12,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     marginTop: 16,
-//   },
-//   searchButtonText: {
-//     color: '#fff',
-//     fontSize: 16,
-//     fontWeight: '600',
-//     marginLeft: 8,
-//   },
-//   quickActionsContainer: {
-//     padding: 16,
-//   },
-//   sectionTitle: {
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//     color: '#1f2937',
-//     marginBottom: 12,
-//   },
-//   quickActions: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     justifyContent: 'space-between',
-//   },
-//   actionCard: {
-//     width: '48%',
-//     backgroundColor: '#fff',
-//     borderRadius: 12,
-//     padding: 16,
-//     alignItems: 'center',
-//     marginBottom: 12,
-//     shadowColor: '#000',
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.1,
-//     shadowRadius: 4,
-//     elevation: 3,
-//   },
-//   actionIcon: {
-//     width: 60,
-//     height: 60,
-//     borderRadius: 30,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     marginBottom: 8,
-//   },
-//   actionLabel: {
-//     fontSize: 14,
-//     fontWeight: '500',
-//     color: '#1f2937',
-//     textAlign: 'center',
-//   },
-//   recentRidesContainer: {
-//     padding: 16,
-//   },
-//   sectionHeader: {
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     alignItems: 'center',
-//     marginBottom: 12,
-//   },
-//   seeAll: {
-//     fontSize: 14,
-//     color: '#10b981',
-//     fontWeight: '600',
-//   },
-//   rideCard: {
-//     backgroundColor: '#fff',
-//     borderRadius: 12,
-//     padding: 16,
-//     marginBottom: 12,
-//     shadowColor: '#000',
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.1,
-//     shadowRadius: 4,
-//     elevation: 3,
-//   },
-//   rideHeader: {
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     alignItems: 'center',
-//     marginBottom: 12,
-//   },
-//   driverInfo: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//   },
-//   avatar: {
-//     width: 40,
-//     height: 40,
-//     borderRadius: 20,
-//     backgroundColor: '#10b981',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     marginRight: 12,
-//   },
-//   avatarText: {
-//     fontSize: 16,
-//     fontWeight: 'bold',
-//     color: '#fff',
-//   },
-//   driverName: {
-//     fontSize: 14,
-//     fontWeight: '600',
-//     color: '#1f2937',
-//   },
-//   ratingRow: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     marginTop: 2,
-//   },
-//   ratingText: {
-//     fontSize: 12,
-//     color: '#6b7280',
-//     marginLeft: 4,
-//   },
-//   price: {
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//     color: '#10b981',
-//   },
-//   rideRoute: {
-//     marginBottom: 8,
-//   },
-//   locationRow: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     marginVertical: 2,
-//   },
-//   locationText: {
-//     fontSize: 14,
-//     color: '#374151',
-//     marginLeft: 8,
-//   },
-//   routeLine: {
-//     width: 2,
-//     height: 12,
-//     backgroundColor: '#d1d5db',
-//     marginLeft: 4,
-//     marginVertical: 2,
-//   },
-//   rideTime: {
-//     fontSize: 12,
-//     color: '#6b7280',
-//     marginTop: 4,
-//   },
-// });
-
-// export default HomeScreen;
+export default ProfileScreen;

@@ -9,7 +9,6 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-// import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -18,13 +17,12 @@ import { validateOTP } from '../../utils/validators';
 import colors from '../../constants/colors';
 import config from '../../constants/config';
 
-// The route will pass phone and email as params after successful registration
 const OTPVerificationScreen = ({ navigation, route }) => {
   const { phone, email } = route.params || {};
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const { verifyOTP } = useAuth();
-  const otpLength = config.OTP_LENGTH; // Use value from config
+  const otpLength = config.OTP_LENGTH;
 
   const handleVerify = async () => {
     if (!validateOTP(otp)) {
@@ -34,11 +32,9 @@ const OTPVerificationScreen = ({ navigation, route }) => {
 
     setLoading(true);
     try {
-      // API call to verify OTP
       const result = await verifyOTP(otp, phone);
       if (result.success) {
-        // Verification successful, useAuth should have updated the global state
-        // and RootNavigator will automatically transition to MainNavigator.
+        // Success - will auto-navigate via auth state change
       } else {
         Alert.alert('Verification Failed', result.error);
       }
@@ -49,10 +45,8 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     }
   };
 
-  // Placeholder for Resend OTP logic
   const handleResendOTP = () => {
     Alert.alert('Resend OTP', 'Resending OTP to your phone/email...');
-    // Add logic here to call a resend OTP API endpoint
   };
 
   return (
@@ -62,7 +56,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Icon name="cellphone-key" size={60} color={colors.primary} />
+          <Text style={styles.logo}>🔑</Text>
           <Text style={styles.title}>Verify Your Account</Text>
           <Text style={styles.subtitle}>
             Enter the {otpLength}-digit code sent to {phone || email}
@@ -117,6 +111,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
+  logo: {
+    fontSize: 60,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -135,7 +132,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   input: {
-    width: '80%', // Make input stand out as an OTP field
+    width: '80%',
     backgroundColor: colors.background,
   },
   otpInputStyle: {
