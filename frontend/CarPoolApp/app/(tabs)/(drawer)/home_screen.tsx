@@ -1,76 +1,30 @@
-import { StyleSheet, View, Text } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native'
 import React from 'react'
-// Import UrlTile and Marker along with MapView
-import MapView, { Marker, UrlTile } from 'react-native-maps'; 
+import { useRouter } from 'expo-router'
 
-const Page = () => {
-  // --- UPDATED TILE URL ---
-  // Switched to Stadia Maps (Stamen Toner Lite) - free tier, no API key needed
-  // Requires attribution (see Text component below)
-  const tileUrl = "https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}.png";
+type Props = {}
+
+const Page = (props: Props) => {
+  const router = useRouter();
 
   return (
     <View style={styles.container}>
-      <MapView 
-        style={styles.map} 
-        initialRegion={{
-          latitude: 37.78825,
-          longitude: -122.4324,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        }}
-        // provider={null} // You can explicitly set provider to null 
+      <Text style={styles.title}>Manage Your Rides</Text>
+      <Text style={styles.subtitle}>What would you like to do?</Text>
+
+      <TouchableOpacity 
+        style={styles.button} 
+        onPress={() => router.push('/(tabs)/(drawer)/existing_rides')}
       >
-        {/* This component overlays the OSM tiles on top of the map */}
-        <UrlTile
-          /**
-           * The URL template for the tile server. {z} is zoom, {x} is x-coord, {y} is y-coord.
-           */
-          urlTemplate={tileUrl}
-          /**
-           * Set a max zoom level.
-           */
-          maximumZ={19}
-          flipY={false} // Standard for this provider
+        <Text style={styles.buttonText}>View Existing Rides</Text>
+      </TouchableOpacity>
 
-          /**
-           * We keep the User-Agent as it's good practice for any web request.
-           */
-          userAgent="edu.yourcollege.carpoolconnect/1.0.0"
-        />
-
-        {/* --- ADD MARKERS HERE --- */}
-        
-        {/* A simple marker at the map's initial location */}
-        <Marker 
-          coordinate={{
-            latitude: 37.78825,
-            longitude: -122.4324
-          }}
-          title="Marker 1"
-          description="This is the first marker"
-        />
-
-        {/* A second marker nearby */}
-        <Marker 
-          coordinate={{
-            latitude: 37.785834,
-            longitude: -122.406417
-          }}
-          title="Marker 2"
-          description="This is another marker"
-          pinColor="blue" // You can also customize the color
-        />
-
-      </MapView>
-
-      {/* --- ATTRIBUTION --- */}
-      {/* Stadia Maps/Stamen requires attribution */}
-      <View style={styles.attributionContainer}>
-        <Text style={styles.attributionText}>
-          Map tiles by Stadia Maps, Stamen Design, under CC BY 3.0. Data © OpenStreetMap contributors.
-        </Text>
-      </View>
+      <TouchableOpacity 
+        style={[styles.button, styles.createButton]} 
+        onPress={() => router.push('/(tabs)/(drawer)/new_ride')}
+      >
+        <Text style={styles.buttonText}>Create a New Ride</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -80,26 +34,36 @@ export default Page
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: '#fff',
   },
-  map: {
-    width: '100%',
-    height: '100%',
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
-  // --- NEW STYLES FOR ATTRIBUTION ---
-  attributionContainer: {
-    position: 'absolute',
-    bottom: 5,
-    left: 5,
-    right: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 5,
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 40,
   },
-  attributionText: {
-    fontSize: 10,
-    textAlign: 'center',
-    color: '#333',
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    width: '80%',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  createButton: {
+    backgroundColor: '#34C759', // A green color for "create"
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 })
-
