@@ -4,31 +4,32 @@ import {
   View, 
   Text, 
   TouchableOpacity, 
-  Platform,
-  SafeAreaView
+  Alert,
+  ActivityIndicator
 } from 'react-native'
-// Import new gesture handler
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-// Import useRef, useState, and useMemo
 import React, { useState, useRef, useMemo } from 'react'
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps'; 
-// Import the new directions library
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'; 
 import MapViewDirections from 'react-native-maps-directions';
-// Import the new Bottom Sheet components
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import RideService from '../../../services/rideService';
 
-const Page = () => {
+const CreateRidePage = () => {
   // --- ADD YOUR GOOGLE MAPS API KEY HERE ---
-  const apiKey = 'AIzaSyBwyBTlQX4vbh1jf49SnKVzHdA6HOH1fjo'; // Make sure this is your valid key
+  const apiKey = 'apikey';
 
   // --- REFS ---
-  const mapRef = useRef<MapView>(null); // For the map
-  const bottomSheetRef = useRef<BottomSheet>(null); // For the bottom sheet
+  const mapRef = useRef<MapView>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
 
   // --- STATE FOR ADDRESS INPUTS ---
   const [startAddress, setStartAddress] = useState('');
   const [endAddress, setEndAddress] = useState('');
-  const [waypoints, setWaypoints] = useState<string[]>([]); // Holds waypoint addresses
+  const [waypoints, setWaypoints] = useState<string[]>([]);
+
+  // --- STATE FOR COORDINATES (will be set when user confirms route) ---
+  const [sourceCoords, setSourceCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [destCoords, setDestCoords] = useState<{lat: number, lng: number} | null>(null);
 
   // --- STATE FOR MAPVIEWDIRECTIONS ---
   const [origin, setOrigin] = useState<string | null>(null);
@@ -37,25 +38,28 @@ const Page = () => {
 
   // --- RIDE INFO STATE ---
   const [rideInfo, setRideInfo] = useState<{ duration: number, distance: number } | null>(null);
-  const [spots, setSpots] = useState(1); // State for available spots
+  const [spots, setSpots] = useState(1);
+  const [pricePerSeat, setPricePerSeat] = useState('');
+  const [departureDate, setDepartureDate] = useState('');
+  const [departureTime, setDepartureTime] = useState('');
   
   // --- UI State ---
   const [isRouteFound, setIsRouteFound] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- BOTTOM SHEET CONFIG ---
-  // Snap points for the drawer: 30% (collapsed), 75% (expanded)
-  const snapPoints = useMemo(() => ['30%', '75%'], []);
+  const snapPoints = useMemo(() => ['35%', '75%'], []);
 
   /**
    * Triggers the MapViewDirections component to draw the route
    */
   const handleFindRoute = () => {
-    if (apiKey === 'YOUR_GOOGLE_MAPS_API_KEY') {
-      alert("Please add your Google Maps API key to the code.");
+    if (apiKey === 'apikey') {
+      Alert.alert("Error", "Please add your Google Maps API key to the code.");
       return;
     }
     if (!startAddress || !endAddress) {
-      alert("Please enter a start and end address.");
+      Alert.alert("Error", "Please enter a start and end address.");
       return;
     }
     setRideInfo(null); 
@@ -68,6 +72,10 @@ const Page = () => {
    * Adds a new empty text input for a waypoint
    */
   const addWaypointInput = () => {
+    if (waypoints.length >= 5) {
+      Alert.alert("Limit Reached", "Maximum 5 stops allowed");
+      return;
+    }
     setWaypoints([...waypoints, '']);
   };
 
@@ -101,25 +109,106 @@ const Page = () => {
     setRouteWaypoints([]);
     setRideInfo(null); 
     setSpots(1); 
-    setIsRouteFound(false); // Go back to input state
-    bottomSheetRef.current?.snapToIndex(1); // Expand sheet
+    setPricePerSeat('');
+    setDepartureDate('');
+    setDepartureTime('');
+    setSourceCoords(null);
+    setDestCoords(null);
+    setIsRouteFound(false);
+    bottomSheetRef.current?.snapToIndex(1);
   };
 
   // --- Helper functions for spots stepper ---
   const incrementSpots = () => setSpots(s => s + 1);
-  const decrementSpots = () => setSpots(s => (s > 1 ? s - 1 : 1)); // Don't allow less than 1 spot
+  const decrementSpots = () => setSpots(s => (s > 1 ? s - 1 : 1));
 
-  // --- Confirm Ride Logic ---
-  const handleConfirmRide = () => {
-    // ---
-    // Add logic here to save the ride (startAddress, endAddress, waypoints, spots, rideInfo)
-    // ---
-    alert(`Ride Confirmed! You are offering ${spots} spot(s).`);
-    resetMap();
+  /**
+   * Submit ride to backend
+   */
+  const handleConfirmRide = async () => {
+    // Validation
+    if (!departureDate || !departureTime) {
+      Alert.alert("Error", "Please select departure date and time");
+      return;
+    }
+
+    if (!pricePerSeat || parseFloat(pricePerSeat) <= 0) {
+      Alert.alert("Error", "Please enter a valid price per seat");
+      return;
+    }
+
+    if (!sourceCoords || !destCoords) {
+      Alert.alert("Error", "Could not get coordinates. Please try finding the route again.");
+      return;
+    }
+
+    if (!rideInfo) {
+      Alert.alert("Error", "Route information missing. Please find route first.");
+      return;
+    }
+
+    // Combine date and time
+    const departureDateTime = new Date(`${departureDate}T${departureTime}`);
+    
+    if (departureDateTime <= new Date()) {
+      Alert.alert("Error", "Departure time must be in the future");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare waypoints data
+      const waypointsData = routeWaypoints.map(wp => ({
+        address: wp,
+        lat: 0, // Google will geocode these
+        lng: 0
+      }));
+
+      // Create ride data
+      const rideData = {
+        source_address: startAddress,
+        source_lat: sourceCoords.lat,
+        source_lng: sourceCoords.lng,
+        destination_address: endAddress,
+        destination_lat: destCoords.lat,
+        destination_lng: destCoords.lng,
+        departure_time: departureDateTime.toISOString(),
+        available_seats: spots,
+        price_per_seat: parseFloat(pricePerSeat),
+        distance_km: rideInfo.distance,
+        duration_minutes: rideInfo.duration,
+        waypoints: waypointsData.length > 0 ? waypointsData : undefined
+      };
+
+      console.log('Creating ride:', rideData);
+
+      const response = await RideService.createRide(rideData);
+
+      if (response.success) {
+        Alert.alert(
+          "Success!", 
+          `Your ride has been created successfully!\n\nRoute: ${startAddress} → ${endAddress}\nSpots: ${spots}\nPrice: ₹${pricePerSeat}/seat`,
+          [
+            {
+              text: "OK",
+              onPress: () => resetMap()
+            }
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error('Error creating ride:', error);
+      Alert.alert(
+        "Failed to Create Ride",
+        error.message || "Something went wrong. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    // This wrapper is required for the bottom sheet
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <MapView 
@@ -127,8 +216,8 @@ const Page = () => {
           style={StyleSheet.absoluteFillObject} 
           provider={PROVIDER_GOOGLE}
           initialRegion={{
-            latitude: 37.78825,
-            longitude: -122.4324,
+            latitude: 28.6139,
+            longitude: 77.2090,
             latitudeDelta: 0.0922,
             longitudeDelta: 0.0421,
           }}
@@ -146,16 +235,25 @@ const Page = () => {
                   duration: Math.round(result.duration),
                   distance: parseFloat(result.distance.toFixed(1))
                 });
-                setIsRouteFound(true); // Switch to confirmation UI
                 
-                // Snap sheet to collapsed state to show confirmation
+                // Store coordinates from the result
+                const coords = result.coordinates;
+                setSourceCoords({
+                  lat: coords[0].latitude,
+                  lng: coords[0].longitude
+                });
+                setDestCoords({
+                  lat: coords[coords.length - 1].latitude,
+                  lng: coords[coords.length - 1].longitude
+                });
+
+                setIsRouteFound(true);
                 bottomSheetRef.current?.snapToIndex(0); 
 
                 mapRef.current?.fitToCoordinates(result.coordinates, {
                   edgePadding: { 
                     top: 50, 
                     right: 50, 
-                    // Adjust padding to account for the collapsed (30%) bottom sheet
                     bottom: 300, 
                     left: 50 
                   }, 
@@ -163,24 +261,20 @@ const Page = () => {
               }}
               onError={(errorMessage) => {
                 console.error("MapViewDirections Error:", errorMessage);
-                alert("Error finding route. Check console for details.");
+                Alert.alert("Route Error", "Could not find route. Please check addresses.");
               }}
             />
           )}
         </MapView>
 
-        {/* --- NEW DRAGGABLE BOTTOM SHEET --- */}
         <BottomSheet
           ref={bottomSheetRef}
-          index={1} // Start expanded (index 1 = '75%')
+          index={1}
           snapPoints={snapPoints}
-          // handleIndicatorStyle={{ backgroundColor: '#ccc' }}
           backgroundStyle={{ backgroundColor: 'white' }}
         >
-          {/* Use BottomSheetScrollView for scrollable content inside sheet */}
           <BottomSheetScrollView contentContainerStyle={styles.scrollContainer}>
             {!isRouteFound ? (
-                /* --- STATE 1: ROUTE INPUT --- */
                 <View style={styles.contentContainer}>
                   <Text style={styles.sheetTitle}>Create Your Ride</Text>
                   
@@ -216,7 +310,6 @@ const Page = () => {
                     <Text style={styles.addStopButtonText}>+ Add Stop</Text>
                   </TouchableOpacity>
 
-                  {/* --- Spots Stepper --- */}
                   <View style={styles.stepperContainer}>
                     <Text style={styles.stepperLabel}>Available Spots:</Text>
                     <View style={styles.stepperControls}>
@@ -230,34 +323,67 @@ const Page = () => {
                     </View>
                   </View>
 
-                  {/* --- Action Button --- */}
                   <TouchableOpacity style={styles.actionButton} onPress={handleFindRoute}>
                     <Text style={styles.actionButtonText}>Find Route</Text>
                   </TouchableOpacity>
                 </View>
 
               ) : (
-                /* --- STATE 2: ROUTE CONFIRMATION --- */
                 <View style={styles.contentContainer}>
-                  <Text style={styles.sheetTitle}>Your Trip</Text>
+                  <Text style={styles.sheetTitle}>Confirm Your Ride</Text>
+                  
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Distance:</Text>
                     <Text style={styles.infoValue}>{rideInfo?.distance} km</Text>
                   </View>
                   <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Est. Duration:</Text>
+                    <Text style={styles.infoLabel}>Duration:</Text>
                     <Text style={styles.infoValue}>{rideInfo?.duration} min</Text>
                   </View>
                   <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Available Spots:</Text>
+                    <Text style={styles.infoLabel}>Spots:</Text>
                     <Text style={styles.infoValue}>{spots}</Text>
                   </View>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Price per seat (₹)"
+                    value={pricePerSeat}
+                    onChangeText={setPricePerSeat}
+                    keyboardType="numeric"
+                  />
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Departure Date (YYYY-MM-DD)"
+                    value={departureDate}
+                    onChangeText={setDepartureDate}
+                  />
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Departure Time (HH:MM)"
+                    value={departureTime}
+                    onChangeText={setDepartureTime}
+                  />
                   
-                  <TouchableOpacity style={styles.actionButton} onPress={handleConfirmRide}>
-                    <Text style={styles.actionButtonText}>Confirm Ride</Text>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, isSubmitting && styles.disabledButton]} 
+                    onPress={handleConfirmRide}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.actionButtonText}>Confirm Ride</Text>
+                    )}
                   </TouchableOpacity>
                   
-                  <TouchableOpacity style={styles.resetButton} onPress={resetMap}>
+                  <TouchableOpacity 
+                    style={styles.resetButton} 
+                    onPress={resetMap}
+                    disabled={isSubmitting}
+                  >
                     <Text style={styles.resetButtonText}>Clear Route</Text>
                   </TouchableOpacity>
                 </View>
@@ -269,19 +395,18 @@ const Page = () => {
   )
 }
 
-export default Page
+export default CreateRidePage
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // This container is for the content *inside* the bottom sheet
   contentContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 30, // Add padding for home bar
+    paddingBottom: 30,
   },
   scrollContainer: {
-    backgroundColor: 'white', // Ensure scroll view has white background
+    backgroundColor: 'white',
   },
   sheetTitle: {
     fontSize: 22,
@@ -373,6 +498,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
   actionButtonText: {
     color: 'white',
     fontSize: 18,
@@ -404,4 +532,3 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 })
-
