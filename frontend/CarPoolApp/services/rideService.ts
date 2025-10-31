@@ -42,7 +42,44 @@ interface FilterOptions {
   };
 }
 
+interface RouteDetails {
+  distance_km: string;
+  duration_minutes: number;
+  polyline: string;
+  start_address: string;
+  end_address: string;
+  bounds: any;
+}
+
 class RideService {
+  /**
+   * NEW: Calculate route on backend (no API key needed in frontend)
+   */
+  async calculateRoute(
+    origin: string,
+    destination: string,
+    waypoints?: string[]
+  ): Promise<RouteDetails> {
+    try {
+      const response = await ApiService.request('/rides/calculate-route', {
+        method: 'POST',
+        body: JSON.stringify({
+          origin,
+          destination,
+          waypoints: waypoints || []
+        })
+      }) as any;
+
+      if (!response.success || !response.route) {
+        throw new Error(response.error || 'Failed to calculate route');
+      }
+
+      return response.route as RouteDetails;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to calculate route');
+    }
+  }
+
   /**
    * Create a new ride
    */
