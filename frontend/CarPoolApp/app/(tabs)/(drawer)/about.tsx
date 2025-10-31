@@ -10,7 +10,7 @@ export default function AboutScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Image 
-          source={require('/Users/sarvesh/engineering/RideShare/CarPoolConnect/Carpool_App/frontend/CarPoolApp/assets/images/android-icon-monochrome.png')} // Replace with your actual logo path
+          source={require('../../../assets/images/android-icon-monochrome.png')} // Replace with your actual logo path
           style={styles.logo}
         />
         <Text style={[styles.appName, { color: colors.text }]}>CarPoolConnect</Text>
