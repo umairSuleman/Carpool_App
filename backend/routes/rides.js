@@ -3,8 +3,57 @@ import { Op } from 'sequelize';
 import { authenticate } from '../middleware/auth.js';
 import rideService from '../services/rideService.js';
 import { validateRideData, validateSearchParams } from '../utils/rideValidation.js';
+import googleMapsService from '../services/googleMapsService.js';
 
 const router = express.Router();
+/**
+ * NEW: Calculate route details on backend
+ * POST /api/rides/calculate-route
+ */
+router.post('/calculate-route', authenticate, async (req, res) => {
+  try {
+    const { origin, destination, waypoints } = req.body;
+
+    if (!origin || !destination) {
+      return res.status(400).json({
+        success: false,
+        error: 'Origin and destination are required'
+      });
+    }
+
+    // Calculate route using Google Maps on backend
+    const routeDetails = await googleMapsService.getRouteDetails(
+      origin,
+      destination,
+      waypoints || []
+    );
+
+    if (!routeDetails.success) {
+      return res.status(400).json({
+        success: false,
+        error: routeDetails.error || 'Failed to calculate route'
+      });
+    }
+
+    res.json({
+      success: true,
+      route: {
+        distance_km: routeDetails.distance_km,
+        duration_minutes: routeDetails.duration_minutes,
+        polyline: routeDetails.polyline,
+        start_address: routeDetails.start_address,
+        end_address: routeDetails.end_address,
+        bounds: routeDetails.bounds
+      }
+    });
+  } catch (error) {
+    console.error('Error calculating route:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to calculate route'
+    });
+  }
+});
 
 /**
  * R.0.1.1 Create Ride (Driver)
