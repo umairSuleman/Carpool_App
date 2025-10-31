@@ -129,6 +129,17 @@ Ride.init({
   duration_minutes: {
     type: DataTypes.INTEGER,
     field: 'duration_minutes'
+  },
+  waypoints: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    get() {
+      const rawValue = this.getDataValue('waypoints');
+      return rawValue ? JSON.parse(rawValue) : [];
+    },
+    set(value) {
+      this.setDataValue('waypoints', JSON.stringify(value));
+    }
   }
 }, {
   sequelize,
