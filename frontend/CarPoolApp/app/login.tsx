@@ -1,40 +1,73 @@
-
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   TextInput,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
   Image, // Import Image
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from "react";
 import { useRouter } from "expo-router";
+import ApiService from "../services/api";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = () => {
-    // ---
-    // Add your real login logic here
-    // ---
-    console.log("Login attempt:", email, password);
+  const handleLogin = async () => {
+    // Validation
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Error", "Please enter both email and password");
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const response = await ApiService.login({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (response.success) {
+        Alert.alert("Success", "Login successful!", [
+          {
+            text: "OK",
+            onPress: () => router.replace("/(tabs)/(drawer)/home_screen"),
+          },
+        ]);
+      }
+    } catch (error: any) {
+      Alert.alert(
+        "Login Failed",
+        error.message || "Invalid email or password. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+    // console.log("Login attempt:", email, password);
 
     // On successful login, redirect to the home screen
-    router.replace("/(tabs)/(drawer)/home_screen");
+    // router.replace("/(tabs)/(drawer)/home_screen");
   };
 
   const handleGoogleLogin = () => {
-    // ---
-    // Add your Google Sign-In logic here
-    // ---
-    console.log("Google login attempt");
-    // On successful login, redirect
-    // router.replace("/(tabs)/(drawer)/home_screen");
+    Alert.alert("Coming Soon", "Google Sign-In will be available soon!");
+  };
+
+  const navigateToRegister = () => {
+    router.push("/register");
+  };
+
+  const handleForgotPassword = () => {
+    Alert.alert("Forgot Password", "Password reset feature coming soon!");
   };
 
   return (
@@ -53,7 +86,9 @@ const LoginPage = () => {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoComplete="email"
           placeholderTextColor="#888"
+          editable={!loading}
         />
         <TextInput
           style={styles.input}
@@ -61,10 +96,28 @@ const LoginPage = () => {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          autoComplete="password"
           placeholderTextColor="#888"
+          editable={!loading}
         />
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Login</Text>
+
+        <TouchableOpacity 
+          onPress={handleForgotPassword}
+          style={styles.forgotPassword}
+        >
+          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.button, loading && styles.buttonDisabled]} 
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ):(
+            <Text style={styles.buttonText}>Login</Text>
+          )}
         </TouchableOpacity>
         
         {/* --- OR Separator --- */}
@@ -78,6 +131,7 @@ const LoginPage = () => {
         <TouchableOpacity 
           style={[styles.button, styles.googleButton]} 
           onPress={handleGoogleLogin}
+          disabled={loading}
         >
           <Image 
             // Using a placeholder for the Google logo
@@ -90,7 +144,7 @@ const LoginPage = () => {
         {/* --- Sign Up Link --- */}
         <View style={styles.signUpContainer}>
           <Text style={styles.linkText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => { /* Handle sign up navigation */ }}>
+          <TouchableOpacity onPress={() => { navigateToRegister }}>
             <Text style={styles.signUpLink}>Sign up</Text>
           </TouchableOpacity>
         </View>
@@ -134,6 +188,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: '#f9f9f9',
   },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 20,
+  },
+  forgotPasswordText: {
+    color: '#007AFF',
+    fontSize: 14,
+  },
   button: {
     backgroundColor: '#007AFF',
     paddingVertical: 15,
@@ -147,6 +209,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.23,
     shadowRadius: 2.62,
     elevation: 4,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
   },
   buttonText: {
     color: "#fff",
