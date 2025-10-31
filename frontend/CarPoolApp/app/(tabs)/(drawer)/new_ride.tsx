@@ -9,15 +9,12 @@ import {
 } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useRef, useMemo } from 'react'
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'; 
-import MapViewDirections from 'react-native-maps-directions';
+import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps'; 
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import RideService from '../../../services/rideService';
+import polyline from '@mapbox/polyline';
 
 const CreateRidePage = () => {
-  // --- ADD YOUR GOOGLE MAPS API KEY HERE ---
-  const apiKey = 'apikey';
-
   // --- REFS ---
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -27,14 +24,10 @@ const CreateRidePage = () => {
   const [endAddress, setEndAddress] = useState('');
   const [waypoints, setWaypoints] = useState<string[]>([]);
 
-  // --- STATE FOR COORDINATES (will be set when user confirms route) ---
+  // --- STATE FOR COORDINATES ---
   const [sourceCoords, setSourceCoords] = useState<{lat: number, lng: number} | null>(null);
   const [destCoords, setDestCoords] = useState<{lat: number, lng: number} | null>(null);
-
-  // --- STATE FOR MAPVIEWDIRECTIONS ---
-  const [origin, setOrigin] = useState<string | null>(null);
-  const [destination, setDestination] = useState<string | null>(null);
-  const [routeWaypoints, setRouteWaypoints] = useState<string[]>([]);
+  const [routeCoordinates, setRouteCoordinates] = useState<{latitude: number, longitude: number}[]>([]);
 
   // --- RIDE INFO STATE ---
   const [rideInfo, setRideInfo] = useState<{ duration: number, distance: number } | null>(null);
@@ -46,26 +39,77 @@ const CreateRidePage = () => {
   // --- UI State ---
   const [isRouteFound, setIsRouteFound] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // --- BOTTOM SHEET CONFIG ---
   const snapPoints = useMemo(() => ['35%', '75%'], []);
 
   /**
-   * Triggers the MapViewDirections component to draw the route
+   * Calculate route using backend (no API key needed)
    */
-  const handleFindRoute = () => {
-    if (apiKey === 'apikey') {
-      Alert.alert("Error", "Please add your Google Maps API key to the code.");
-      return;
-    }
+  const handleFindRoute = async () => {
     if (!startAddress || !endAddress) {
       Alert.alert("Error", "Please enter a start and end address.");
       return;
     }
-    setRideInfo(null); 
-    setOrigin(startAddress);
-    setDestination(endAddress);
-    setRouteWaypoints(waypoints.filter(wp => wp.length > 0));
+
+    setIsCalculatingRoute(true);
+    setRideInfo(null);
+    
+    try {
+      // Call backend to calculate route
+      const route = await RideService.calculateRoute(
+        startAddress,
+        endAddress,
+        waypoints.filter(wp => wp.length > 0)
+      );
+
+      // Decode polyline to get coordinates for map display
+      const coords = polyline.decode(route.polyline).map(([lat, lng]) => ({
+        latitude: lat,
+        longitude: lng
+      }));
+
+      // Set route data
+      setRouteCoordinates(coords);
+      setRideInfo({
+        duration: route.duration_minutes,
+        distance: parseFloat(route.distance_km)
+      });
+
+      // Store start and end coordinates
+      if (coords.length > 0) {
+        setSourceCoords({
+          lat: coords[0].latitude,
+          lng: coords[0].longitude
+        });
+        setDestCoords({
+          lat: coords[coords.length - 1].latitude,
+          lng: coords[coords.length - 1].longitude
+        });
+      }
+
+      setIsRouteFound(true);
+      bottomSheetRef.current?.snapToIndex(0);
+
+      // Fit map to route
+      if (mapRef.current && coords.length > 0) {
+        mapRef.current.fitToCoordinates(coords, {
+          edgePadding: { 
+            top: 50, 
+            right: 50, 
+            bottom: 300, 
+            left: 50 
+          },
+          animated: true
+        });
+      }
+    } catch (error: any) {
+      console.error("Route calculation error:", error);
+      Alert.alert("Route Error", error.message || "Could not find route. Please check addresses.");
+    } finally {
+      setIsCalculatingRoute(false);
+    }
   };
 
   /**
@@ -104,9 +148,7 @@ const CreateRidePage = () => {
     setStartAddress('');
     setEndAddress('');
     setWaypoints([]);
-    setOrigin(null);
-    setDestination(null);
-    setRouteWaypoints([]);
+    setRouteCoordinates([]);
     setRideInfo(null); 
     setSpots(1); 
     setPricePerSeat('');
@@ -159,11 +201,13 @@ const CreateRidePage = () => {
 
     try {
       // Prepare waypoints data
-      const waypointsData = routeWaypoints.map(wp => ({
-        address: wp,
-        lat: 0, // Google will geocode these
-        lng: 0
-      }));
+      const waypointsData = waypoints
+        .filter(wp => wp.length > 0)
+        .map(wp => ({
+          address: wp,
+          lat: 0, // Backend will geocode these
+          lng: 0
+        }));
 
       // Create ride data
       const rideData = {
@@ -222,47 +266,36 @@ const CreateRidePage = () => {
             longitudeDelta: 0.0421,
           }}
         >
-          {origin && destination && (
-            <MapViewDirections
-              origin={origin}
-              destination={destination}
-              waypoints={routeWaypoints}
-              apikey={apiKey}
+          {/* Draw route polyline */}
+          {routeCoordinates.length > 0 && (
+            <Polyline
+              coordinates={routeCoordinates}
               strokeWidth={6}
               strokeColor="#007AFF"
-              onReady={result => {
-                setRideInfo({
-                  duration: Math.round(result.duration),
-                  distance: parseFloat(result.distance.toFixed(1))
-                });
-                
-                // Store coordinates from the result
-                const coords = result.coordinates;
-                setSourceCoords({
-                  lat: coords[0].latitude,
-                  lng: coords[0].longitude
-                });
-                setDestCoords({
-                  lat: coords[coords.length - 1].latitude,
-                  lng: coords[coords.length - 1].longitude
-                });
+            />
+          )}
 
-                setIsRouteFound(true);
-                bottomSheetRef.current?.snapToIndex(0); 
+          {/* Start marker */}
+          {sourceCoords && (
+            <Marker
+              coordinate={{
+                latitude: sourceCoords.lat,
+                longitude: sourceCoords.lng
+              }}
+              title="Start"
+              pinColor="green"
+            />
+          )}
 
-                mapRef.current?.fitToCoordinates(result.coordinates, {
-                  edgePadding: { 
-                    top: 50, 
-                    right: 50, 
-                    bottom: 300, 
-                    left: 50 
-                  }, 
-                });
+          {/* End marker */}
+          {destCoords && (
+            <Marker
+              coordinate={{
+                latitude: destCoords.lat,
+                longitude: destCoords.lng
               }}
-              onError={(errorMessage) => {
-                console.error("MapViewDirections Error:", errorMessage);
-                Alert.alert("Route Error", "Could not find route. Please check addresses.");
-              }}
+              title="Destination"
+              pinColor="red"
             />
           )}
         </MapView>
@@ -323,8 +356,16 @@ const CreateRidePage = () => {
                     </View>
                   </View>
 
-                  <TouchableOpacity style={styles.actionButton} onPress={handleFindRoute}>
-                    <Text style={styles.actionButtonText}>Find Route</Text>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, isCalculatingRoute && styles.disabledButton]} 
+                    onPress={handleFindRoute}
+                    disabled={isCalculatingRoute}
+                  >
+                    {isCalculatingRoute ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.actionButtonText}>Find Route</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
 
