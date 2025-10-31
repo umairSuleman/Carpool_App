@@ -90,6 +90,7 @@ const LoginPage = () => {
           placeholderTextColor="#888"
           editable={!loading}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -144,7 +145,7 @@ const LoginPage = () => {
         {/* --- Sign Up Link --- */}
         <View style={styles.signUpContainer}>
           <Text style={styles.linkText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => { navigateToRegister }}>
+          <TouchableOpacity onPress={() => {navigateToRegister}}>
             <Text style={styles.signUpLink}>Sign up</Text>
           </TouchableOpacity>
         </View>
