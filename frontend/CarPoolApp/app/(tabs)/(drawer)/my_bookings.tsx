@@ -18,6 +18,7 @@ interface Booking {
   seats_booked: number;
   total_price: number;
   status: string;
+  payment_status: string;
   created_at: string;
   ride: {
     id: string;
@@ -53,6 +54,16 @@ const MyBookingsScreen = () => {
   useEffect(() => {
     loadBookings();
   }, [filter]);
+
+  const handlePayNow = (booking: Booking) => {
+    router.push({
+      pathname:'/payment',
+      params:{
+        bookingId: booking.id,
+        amount: booking.total_price
+      }
+    });
+  };
 
   const loadBookings = async () => {
     try {
@@ -159,17 +170,26 @@ const MyBookingsScreen = () => {
       : 'New';
     
     const canCancel = item.status.toLowerCase() === 'confirmed' || item.status.toLowerCase() === 'pending';
+    const needsPayment = item.payment_status === 'pending' && item.status !== 'cancelled';
     
     return (
       <TouchableOpacity 
         style={styles.bookingCard}
         onPress={() => handleViewDetails(item)}
       >
-        <View style={styles.statusBadge}>
-          <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
-          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-          </Text>
+        <View style= {styles.statusRow}>
+          <View style={styles.statusBadge}>
+            <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+            </Text>
+          </View>
+
+          {needsPayment && (
+             <View style={styles.paymentStatusBadge}>
+               <Text style={styles.paymentStatusText}>Payment Pending</Text>
+             </View>
+          )}
         </View>
 
         <View style={styles.routeContainer}>
@@ -231,13 +251,22 @@ const MyBookingsScreen = () => {
           )}
         </View>
 
-        {canCancel && (
+        {needsPayment ? (
           <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => handleCancelBooking(item.id)}
+            style={[styles.actionButton, styles.payButton]}
+            onPress={() => handlePayNow(item)}
           >
-            <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            <Text style={styles.actionButtonText}>Pay Now (₹{item.total_price})</Text>
           </TouchableOpacity>
+        ) : (
+          canCancel && (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelBooking(item.id)}
+            >
+              <Text style={styles.actionButtonText}>Cancel Booking</Text>
+            </TouchableOpacity>
+          )
         )}
       </TouchableOpacity>
     );
@@ -510,4 +539,36 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 5,
   },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  paymentStatusBadge: {
+    backgroundColor: '#FF9500',
+    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  paymentStatusText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  // ... (other styles)
+  actionButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  payButton: {
+    backgroundColor: '#34C759', // Green for 'Pay'
+  }
 });
