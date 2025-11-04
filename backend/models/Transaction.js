@@ -60,7 +60,8 @@ Transaction.init({
     field: 'reference_type'
   },
   payment_method: {
-    type: DataTypes.ENUM('wallet', 'upi', 'card', 'netbanking', 'cash'),
+    // --- THIS IS THE MODIFIED LINE ---
+    type: DataTypes.ENUM('wallet', 'upi', 'card', 'netbanking', 'cash', 'gateway'),
     field: 'payment_method'
   },
   payment_gateway_ref: {
