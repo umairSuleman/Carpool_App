@@ -313,6 +313,44 @@ class RideService {
     };
   }
 
+  // --- NEW FUNCTION ---
+  /**
+   * Get driver's rides
+   */
+  async getDriverRides(driverId, status) {
+    const whereClause = {
+      driver_id: driverId
+    };
+
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        // Active rides are those that are 'active' or 'in_progress'
+        whereClause.status = { [Op.in]: ['active', 'in_progress'] };
+      } else {
+        whereClause.status = status;
+      }
+    }
+
+    const rides = await Ride.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Booking,
+          as: 'bookings',
+          attributes: ['id', 'seats_booked'],
+          required: false // So rides with 0 bookings are also returned
+        }
+      ],
+      order: [['departure_time', 'ASC']]
+    });
+
+    return {
+      success: true,
+      count: rides.length,
+      rides: rides 
+    };
+  }
+
   /**
    * Calculate distance between two coordinates using Haversine formula
    */
