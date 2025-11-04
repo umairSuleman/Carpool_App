@@ -47,7 +47,7 @@ Booking.init({
   },
   booking_status: {
     type: DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'completed'),
-    defaultValue: 'pending',
+    defaultValue: 'confirmed',  //changed to confirmed from pending
     field: 'booking_status'
   },
   payment_status: {
