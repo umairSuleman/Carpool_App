@@ -1,9 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://10.239.58.45:5000/api'; // Replace with your backend IP
-// For iOS simulator: http://localhost:5000/api
-// For Android emulator: http://10.0.2.2:5000/api
-// For real device: http://YOUR_COMPUTER_IP:5000/api
+const API_URL = 'http://10.63.194.45:5000/api'; // Replace with your backend IP
 
 interface RegisterData {
   name: string;
@@ -25,6 +22,7 @@ interface ApiResponse<T = any> {
   user?: any;
   error?: string;
   details?: any;
+  [key:string]: any;
 }
 
 class ApiService {
