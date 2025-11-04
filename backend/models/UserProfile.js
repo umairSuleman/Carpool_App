@@ -63,6 +63,10 @@ UserProfile.init({
         type: DataTypes.DECIMAL(2, 1),
         defaultValue: null,     //changed from 5.0 to null
         allowNull: true,        //allow null for new users
+        get() {
+            const value = this.getDataValue('rating');
+            return value !== null ? parseFloat(value) : null;  
+        },
         validate: {
         min: { args: '0', msg: 'Rating cannot be less than 0' },
         max: { args: '5', msg: 'Rating cannot be more than 5' }
