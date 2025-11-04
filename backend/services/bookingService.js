@@ -11,10 +11,13 @@ import {
   DriverInfo
 } from '../models/associations.js';
 
+// Import the new payment service to handle payouts
+import paymentService from './paymentService.js';
+
 class BookingService {
 
   /**
-   * Create a new booking
+   * Create a new booking (PAYMENT IS HANDLED SEPARATELY)
    */
   async createBooking(passengerId, bookingData) {
     const { ride_id, seats_booked, pickup_location, dropoff_location } = bookingData;
@@ -64,70 +67,29 @@ class BookingService {
       // 6. Calculate total amount
       const totalAmount = ride.price_per_seat * seats_booked;
 
-      // 7. Find passenger and lock them
-      const passenger = await User.findByPk(passengerId, {
-        lock: t.LOCK.UPDATE,
-        transaction: t
-      });
-
-      if (!passenger) {
-        throw new Error('Passenger not found');
-      }
-
-      // 8. Find and lock the wallet separately to avoid outer join error
-      const wallet = await Wallet.findOne({
-        where: { user_id: passengerId },
-        lock: t.LOCK.UPDATE,
-        transaction: t
-      });
-
-      if (!wallet) {
-        throw new Error('Passenger wallet not found');
-      }
-
-      // 9. Check balance
-      if (wallet.balance < totalAmount) {
-        throw new Error('Insufficient balance');
-      }
-
-      // 10. Deduct balance from passenger wallet
-      await wallet.decrement('balance', { by: totalAmount, transaction: t });
-
-      // 11. Create booking
+      // 7. Create booking with pending payment
       const booking = await Booking.create({
         ride_id,
         passenger_id: passengerId,
         seats_booked,
         total_amount: totalAmount,
-        booking_status: 'confirmed',
-        payment_status: 'completed',
+        booking_status: 'confirmed',  // Booking is confirmed
+        payment_status: 'pending',    // Payment is pending
+        payment_method: 'pending',
         pickup_location: pickup_location || ride.source_address,
         dropoff_location: dropoff_location || ride.destination_address
       }, { transaction: t });
 
-      // 12. Update ride's booked_seats
+      // 8. Update ride's booked_seats
       await ride.increment('booked_seats', { by: seats_booked, transaction: t });
 
-      // 13. Create passenger transaction (debit)
-      await Transaction.create({
-        user_id: passengerId,
-        wallet_id: wallet.id, // Use the wallet.id from the separate query
-        amount: totalAmount,
-        transaction_type: 'debit',
-        category: 'ride_payment',
-        reference_id: booking.id,
-        reference_type: 'booking',
-        status: 'success',
-        description: `Payment for ${seats_booked} seat(s) on ride to ${ride.destination_address}`
-      }, { transaction: t });
-
-      // 14. Commit transaction
+      // 9. Commit transaction
       await t.commit();
 
-      // 15. Return successful booking (TODO: Notify driver)
+      // 10. Return successful booking
       return {
         success: true,
-        message: 'Booking confirmed',
+        message: 'Booking confirmed. Please complete payment.',
         booking: await this.getBookingDetails(booking.id, passengerId)
       };
 
@@ -137,6 +99,8 @@ class BookingService {
     }
   }
 
+  // ... (getMyBookings and getBookingDetails remain the same) ...
+  
   /**
    * Get all bookings for a user
    */
@@ -184,7 +148,6 @@ class BookingService {
       where: whereClause,
       include: includeOptions,
       order: [
-        // --- THIS IS THE CORRECTED LINE ---
         ['ride', 'departure_time', 'ASC']
       ]
     });
@@ -196,6 +159,8 @@ class BookingService {
       seats_booked: b.seats_booked,
       total_price: b.total_amount, // Frontend expects total_price
       status: b.booking_status,
+      // --- ADDED PAYMENT STATUS ---
+      payment_status: b.payment_status,
       created_at: b.created_at,
       ride: b.ride // The ride object is already structured as needed
     }));
@@ -251,6 +216,7 @@ class BookingService {
     };
   }
 
+
   /**
    * Cancel a booking (by passenger)
    */
@@ -283,12 +249,9 @@ class BookingService {
       if (!ride) {
         throw new Error('Associated ride not found');
       }
-
-      // 4. Check cancellation window (e.g., 1 hour before departure)
-      const cancellationDeadline = new Date(ride.departure_time.getTime() - (60 * 60 * 1000));
-      if (new Date() > cancellationDeadline) {
-        throw new Error('Cannot cancel booking less than 1 hour before departure');
-      }
+      
+      // 4. Check if payment was already made
+      const isPaid = booking.payment_status === 'completed';
 
       // 5. Update booking status
       await booking.update({
@@ -296,38 +259,38 @@ class BookingService {
         cancellation_reason: reason,
         cancelled_by: passengerId,
         cancelled_at: new Date(),
-        payment_status: 'refunded' // Assuming full refund
+        payment_status: isPaid ? 'refunded' : 'cancelled' // Mark for refund if paid
       }, { transaction: t });
 
       // 6. Release seats on ride
       await ride.decrement('booked_seats', { by: booking.seats_booked, transaction: t });
 
-      // 7. Refund passenger
-      const passengerWallet = await Wallet.findOne({ where: { user_id: passengerId }, transaction: t });
-      if (passengerWallet) {
-        await passengerWallet.increment('balance', { by: booking.total_amount, transaction: t });
-        
-        // 8. Log refund transaction
-        await Transaction.create({
-          user_id: passengerId,
-          wallet_id: passengerWallet.id,
-          amount: booking.total_amount,
-          transaction_type: 'credit',
-          category: 'refund',
-          reference_id: booking.id,
-          reference_type: 'booking',
-          status: 'success',
-          description: `Refund for cancelled booking ${booking.id}`
-        }, { transaction: t });
+      // 7. Refund passenger IF they already paid
+      if (isPaid) {
+        const passengerWallet = await Wallet.findOne({ where: { user_id: passengerId }, transaction: t });
+        if (passengerWallet) {
+          await passengerWallet.increment('balance', { by: booking.total_amount, transaction: t });
+          
+          // 8. Log refund transaction
+          await Transaction.create({
+            user_id: passengerId,
+            wallet_id: passengerWallet.id,
+            amount: booking.total_amount,
+            transaction_type: 'credit',
+            category: 'refund',
+            reference_id: booking.id,
+            reference_type: 'booking',
+            status: 'success',
+            description: `Refund for cancelled booking ${booking.id}`
+          }, { transaction: t });
+        }
       }
 
       await t.commit();
-
-      // TODO: Notify driver of cancellation
-
+      
       return {
         success: true,
-        message: 'Booking cancelled and refunded successfully',
+        message: isPaid ? 'Booking cancelled and refunded successfully' : 'Booking cancelled',
         booking
       };
 
@@ -369,70 +332,50 @@ class BookingService {
 
       // Handle 'completed'
       if (status === 'completed') {
-        // Transfer funds from passenger (already debited) to driver
-        const driverWallet = await Wallet.findOne({ where: { user_id: driverId }, transaction: t });
-        if (!driverWallet) {
-          throw new Error('Driver wallet not found');
-        }
-        
-        // TODO: Apply commission logic
-        const commissionRate = 0.10; // 10%
-        const commission = booking.total_amount * commissionRate;
-        const earning = booking.total_amount - commission;
-
-        // 1. Credit driver's wallet
-        await driverWallet.increment('balance', { by: earning, transaction: t });
-
-        // 2. Log driver earning transaction
-        await Transaction.create({
-          user_id: driverId,
-          wallet_id: driverWallet.id,
-          amount: earning,
-          transaction_type: 'credit',
-          category: 'ride_earning',
-          reference_id: booking.id,
-          reference_type: 'booking',
-          status: 'success',
-          description: `Earning from booking ${booking.id}`
-        }, { transaction: t });
-        
-        // 3. Log commission transaction (to admin/platform wallet - not implemented here)
-        console.log(`Commission of ${commission} earned from booking ${booking.id}`);
-
-        // 4. Update booking status
+        // Just mark as completed. Payment is handled by paymentService.
         await booking.update({ booking_status: 'completed' }, { transaction: t });
+        
+        // If payment is already completed, process payout
+        if (booking.payment_status === 'completed') {
+          await paymentService.processPayout(booking, t);
+        }
+        // If payment is pending, user will be prompted to pay.
+        // Payout will happen upon payment verification.
       }
       
       // Handle 'cancelled' (by driver)
       if (status === 'cancelled') {
-        // This is a driver cancellation, full refund to passenger
+        const isPaid = booking.payment_status === 'completed';
+
         await booking.update({
           booking_status: 'cancelled',
           cancellation_reason: 'Cancelled by driver',
           cancelled_by: driverId,
           cancelled_at: new Date(),
-          payment_status: 'refunded'
+          payment_status: isPaid ? 'refunded' : 'cancelled'
         }, { transaction: t });
 
         // Release seats
         await booking.ride.decrement('booked_seats', { by: booking.seats_booked, transaction: t });
         
-        // Refund passenger
-        const passengerWallet = await Wallet.findOne({ where: { user_id: booking.passenger_id }, transaction: t });
-        if (passengerWallet) {
-          await passengerWallet.increment('balance', { by: booking.total_amount, transaction: t });
-          
-          await Transaction.create({
-            user_id: booking.passenger_id,
-            wallet_id: passengerWallet.id,
-            amount: booking.total_amount,
-            transaction_type: 'credit',
-            category: 'refund',
-            reference_id: booking.id,
-            reference_type: 'booking',
-            status: 'success',
-            description: `Refund for driver-cancelled booking ${booking.id}`
-          }, { transaction: t });
+        // Refund passenger if they paid
+        if (isPaid) {
+          const passengerWallet = await Wallet.findOne({ where: { user_id: booking.passenger_id }, transaction: t });
+          if (passengerWallet) {
+            await passengerWallet.increment('balance', { by: booking.total_amount, transaction: t });
+            
+            await Transaction.create({
+              user_id: booking.passenger_id,
+              wallet_id: passengerWallet.id,
+              amount: booking.total_amount,
+              transaction_type: 'credit',
+              category: 'refund',
+              reference_id: booking.id,
+              reference_type: 'booking',
+              status: 'success',
+              description: `Refund for driver-cancelled booking ${booking.id}`
+            }, { transaction: t });
+          }
         }
       }
 
