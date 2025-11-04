@@ -5,7 +5,10 @@ import {
   Text, 
   TouchableOpacity, 
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
 } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useRef, useMemo } from 'react'
@@ -41,8 +44,8 @@ const CreateRidePage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
-  // --- BOTTOM SHEET CONFIG ---
-  const snapPoints = useMemo(() => ['35%', '75%'], []);
+  // --- BOTTOM SHEET CONFIG - Changed to start at 85% ---
+  const snapPoints = useMemo(() => ['85%', '95%'], []);
 
   /**
    * Calculate route using backend (no API key needed)
@@ -57,27 +60,23 @@ const CreateRidePage = () => {
     setRideInfo(null);
     
     try {
-      // Call backend to calculate route
       const route = await RideService.calculateRoute(
         startAddress,
         endAddress,
         waypoints.filter(wp => wp.length > 0)
       );
 
-      // Decode polyline to get coordinates for map display
       const coords = polyline.decode(route.polyline).map(([lat, lng]) => ({
         latitude: lat,
         longitude: lng
       }));
 
-      // Set route data
       setRouteCoordinates(coords);
       setRideInfo({
         duration: route.duration_minutes,
         distance: parseFloat(route.distance_km)
       });
 
-      // Store start and end coordinates
       if (coords.length > 0) {
         setSourceCoords({
           lat: coords[0].latitude,
@@ -90,15 +89,13 @@ const CreateRidePage = () => {
       }
 
       setIsRouteFound(true);
-      bottomSheetRef.current?.snapToIndex(0);
 
-      // Fit map to route
       if (mapRef.current && coords.length > 0) {
         mapRef.current.fitToCoordinates(coords, {
           edgePadding: { 
             top: 50, 
             right: 50, 
-            bottom: 300, 
+            bottom: 50, 
             left: 50 
           },
           animated: true
@@ -112,9 +109,6 @@ const CreateRidePage = () => {
     }
   };
 
-  /**
-   * Adds a new empty text input for a waypoint
-   */
   const addWaypointInput = () => {
     if (waypoints.length >= 5) {
       Alert.alert("Limit Reached", "Maximum 5 stops allowed");
@@ -123,27 +117,18 @@ const CreateRidePage = () => {
     setWaypoints([...waypoints, '']);
   };
 
-  /**
-   * Removes a waypoint input
-   */
   const removeWaypoint = (index: number) => {
     const newWaypoints = [...waypoints];
     newWaypoints.splice(index, 1);
     setWaypoints(newWaypoints);
   };
 
-  /**
-   * Updates the specific waypoint text when user types
-   */
   const updateWaypoint = (text: string, index: number) => {
     const newWaypoints = [...waypoints];
     newWaypoints[index] = text;
     setWaypoints(newWaypoints);
   };
 
-  /**
-   * Resets the entire map and all inputs
-   */
   const resetMap = () => {
     setStartAddress('');
     setEndAddress('');
@@ -157,18 +142,12 @@ const CreateRidePage = () => {
     setSourceCoords(null);
     setDestCoords(null);
     setIsRouteFound(false);
-    bottomSheetRef.current?.snapToIndex(1);
   };
 
-  // --- Helper functions for spots stepper ---
   const incrementSpots = () => setSpots(s => s + 1);
   const decrementSpots = () => setSpots(s => (s > 1 ? s - 1 : 1));
 
-  /**
-   * Submit ride to backend
-   */
   const handleConfirmRide = async () => {
-    // Validation
     if (!departureDate || !departureTime) {
       Alert.alert("Error", "Please select departure date and time");
       return;
@@ -189,7 +168,6 @@ const CreateRidePage = () => {
       return;
     }
 
-    // Combine date and time
     const departureDateTime = new Date(`${departureDate}T${departureTime}`);
     
     if (departureDateTime <= new Date()) {
@@ -200,16 +178,14 @@ const CreateRidePage = () => {
     setIsSubmitting(true);
 
     try {
-      // Prepare waypoints data
       const waypointsData = waypoints
         .filter(wp => wp.length > 0)
         .map(wp => ({
           address: wp,
-          lat: 0, // Backend will geocode these
+          lat: 0,
           lng: 0
         }));
 
-      // Create ride data
       const rideData = {
         source_address: startAddress,
         source_lat: sourceCoords.lat,
@@ -224,8 +200,6 @@ const CreateRidePage = () => {
         duration_minutes: rideInfo.duration,
         waypoints: waypointsData.length > 0 ? waypointsData : undefined
       };
-
-      console.log('Creating ride:', rideData);
 
       const response = await RideService.createRide(rideData);
 
@@ -254,7 +228,11 @@ const CreateRidePage = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         <MapView 
           ref={mapRef} 
           style={StyleSheet.absoluteFillObject} 
@@ -266,7 +244,6 @@ const CreateRidePage = () => {
             longitudeDelta: 0.0421,
           }}
         >
-          {/* Draw route polyline */}
           {routeCoordinates.length > 0 && (
             <Polyline
               coordinates={routeCoordinates}
@@ -275,7 +252,6 @@ const CreateRidePage = () => {
             />
           )}
 
-          {/* Start marker */}
           {sourceCoords && (
             <Marker
               coordinate={{
@@ -287,7 +263,6 @@ const CreateRidePage = () => {
             />
           )}
 
-          {/* End marker */}
           {destCoords && (
             <Marker
               coordinate={{
@@ -302,136 +277,142 @@ const CreateRidePage = () => {
 
         <BottomSheet
           ref={bottomSheetRef}
-          index={1}
+          index={0}
           snapPoints={snapPoints}
           backgroundStyle={{ backgroundColor: 'white' }}
+          enablePanDownToClose={false}
+          keyboardBehavior="interactive"
+          keyboardBlurBehavior="restore"
+          android_keyboardInputMode="adjustResize"
         >
-          <BottomSheetScrollView contentContainerStyle={styles.scrollContainer}>
+          <BottomSheetScrollView 
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+          >
             {!isRouteFound ? (
-                <View style={styles.contentContainer}>
-                  <Text style={styles.sheetTitle}>Create Your Ride</Text>
-                  
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Start Address"
-                    value={startAddress}
-                    onChangeText={setStartAddress}
-                  />
-                  
-                  {waypoints.map((wp, index) => (
-                    <View key={index} style={styles.waypointContainer}>
-                      <TextInput
-                        style={styles.waypointInput}
-                        placeholder={`Stop ${index + 1}`}
-                        value={wp}
-                        onChangeText={(text) => updateWaypoint(text, index)}
-                      />
-                      <TouchableOpacity onPress={() => removeWaypoint(index)} style={styles.removeButton}>
-                        <Text style={styles.removeButtonText}>−</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                  
-                  <TextInput
-                    style={styles.input}
-                    placeholder="End Address"
-                    value={endAddress}
-                    onChangeText={setEndAddress}
-                  />
-                  
-                  <TouchableOpacity onPress={addWaypointInput} style={styles.addStopButton}>
-                    <Text style={styles.addStopButtonText}>+ Add Stop</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.stepperContainer}>
-                    <Text style={styles.stepperLabel}>Available Spots:</Text>
-                    <View style={styles.stepperControls}>
-                      <TouchableOpacity onPress={decrementSpots} style={styles.stepperButton}>
-                        <Text style={styles.stepperButtonText}>-</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.stepperValue}>{spots}</Text>
-                      <TouchableOpacity onPress={incrementSpots} style={styles.stepperButton}>
-                        <Text style={styles.stepperButtonText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+              <View style={styles.contentContainer}>
+                <Text style={styles.sheetTitle}>Create Your Ride</Text>
+                
+                <TextInput
+                  style={styles.input}
+                  placeholder="Start Address"
+                  value={startAddress}
+                  onChangeText={setStartAddress}
+                />
+                
+                {waypoints.map((wp, index) => (
+                  <View key={index} style={styles.waypointContainer}>
+                    <TextInput
+                      style={styles.waypointInput}
+                      placeholder={`Stop ${index + 1}`}
+                      value={wp}
+                      onChangeText={(text) => updateWaypoint(text, index)}
+                    />
+                    <TouchableOpacity onPress={() => removeWaypoint(index)} style={styles.removeButton}>
+                      <Text style={styles.removeButtonText}>−</Text>
+                    </TouchableOpacity>
                   </View>
+                ))}
+                
+                <TextInput
+                  style={styles.input}
+                  placeholder="End Address"
+                  value={endAddress}
+                  onChangeText={setEndAddress}
+                />
+                
+                <TouchableOpacity onPress={addWaypointInput} style={styles.addStopButton}>
+                  <Text style={styles.addStopButtonText}>+ Add Stop</Text>
+                </TouchableOpacity>
 
-                  <TouchableOpacity 
-                    style={[styles.actionButton, isCalculatingRoute && styles.disabledButton]} 
-                    onPress={handleFindRoute}
-                    disabled={isCalculatingRoute}
-                  >
-                    {isCalculatingRoute ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.actionButtonText}>Find Route</Text>
-                    )}
-                  </TouchableOpacity>
+                <View style={styles.stepperContainer}>
+                  <Text style={styles.stepperLabel}>Available Spots:</Text>
+                  <View style={styles.stepperControls}>
+                    <TouchableOpacity onPress={decrementSpots} style={styles.stepperButton}>
+                      <Text style={styles.stepperButtonText}>-</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.stepperValue}>{spots}</Text>
+                    <TouchableOpacity onPress={incrementSpots} style={styles.stepperButton}>
+                      <Text style={styles.stepperButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-              ) : (
-                <View style={styles.contentContainer}>
-                  <Text style={styles.sheetTitle}>Confirm Your Ride</Text>
-                  
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Distance:</Text>
-                    <Text style={styles.infoValue}>{rideInfo?.distance} km</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Duration:</Text>
-                    <Text style={styles.infoValue}>{rideInfo?.duration} min</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Spots:</Text>
-                    <Text style={styles.infoValue}>{spots}</Text>
-                  </View>
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Price per seat (₹)"
-                    value={pricePerSeat}
-                    onChangeText={setPricePerSeat}
-                    keyboardType="numeric"
-                  />
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Departure Date (YYYY-MM-DD)"
-                    value={departureDate}
-                    onChangeText={setDepartureDate}
-                  />
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Departure Time (HH:MM)"
-                    value={departureTime}
-                    onChangeText={setDepartureTime}
-                  />
-                  
-                  <TouchableOpacity 
-                    style={[styles.actionButton, isSubmitting && styles.disabledButton]} 
-                    onPress={handleConfirmRide}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.actionButtonText}>Confirm Ride</Text>
-                    )}
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.resetButton} 
-                    onPress={resetMap}
-                    disabled={isSubmitting}
-                  >
-                    <Text style={styles.resetButtonText}>Clear Route</Text>
-                  </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionButton, isCalculatingRoute && styles.disabledButton]} 
+                  onPress={handleFindRoute}
+                  disabled={isCalculatingRoute}
+                >
+                  {isCalculatingRoute ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.actionButtonText}>Find Route</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.contentContainer}>
+                <Text style={styles.sheetTitle}>Confirm Your Ride</Text>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Distance:</Text>
+                  <Text style={styles.infoValue}>{rideInfo?.distance} km</Text>
                 </View>
-              )}
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Duration:</Text>
+                  <Text style={styles.infoValue}>{rideInfo?.duration} min</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Spots:</Text>
+                  <Text style={styles.infoValue}>{spots}</Text>
+                </View>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Price per seat (₹)"
+                  value={pricePerSeat}
+                  onChangeText={setPricePerSeat}
+                  keyboardType="numeric"
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Departure Date (YYYY-MM-DD)"
+                  value={departureDate}
+                  onChangeText={setDepartureDate}
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Departure Time (HH:MM)"
+                  value={departureTime}
+                  onChangeText={setDepartureTime}
+                />
+                
+                <TouchableOpacity 
+                  style={[styles.actionButton, isSubmitting && styles.disabledButton]} 
+                  onPress={handleConfirmRide}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.actionButtonText}>Confirm Ride</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.resetButton} 
+                  onPress={resetMap}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.resetButtonText}>Clear Route</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </BottomSheetScrollView>
         </BottomSheet>
-      </View>
+      </KeyboardAvoidingView>
     </GestureHandlerRootView>
   )
 }
@@ -445,6 +426,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: 20,
     paddingBottom: 30,
+    paddingTop: 10,
   },
   scrollContainer: {
     backgroundColor: 'white',
