@@ -178,11 +178,7 @@ const RideDetailsScreen = () => {
 
     Alert.alert(
       'Confirm Booking',
-      `Book ${seatsToBook} seat(s) for ₹${totalAmount}?\n\nFrom: ${
-        ride.source_address
-      }\nTo: ${ride.destination_address}\nDate: ${formatDate(
-        ride.departure_time
-      )}`,
+      `This will confirm your ${seatsToBook} seat(s) for ₹${totalAmount}.\n\nYou can choose to pay now or pay later from the "My Bookings" screen.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Confirm', onPress: () => processBooking() },
@@ -202,22 +198,31 @@ const RideDetailsScreen = () => {
         dropoff_location: ride.destination_address,
       });
 
-      if (response.success) {
+      if (response.success && response.booking) {
+        const{ id: newBookingId, total_amount }= response.booking.booking;
+
         Alert.alert(
           'Booking Successful!',
-          'Your ride has been booked successfully.',
+          'Your ride is confirmed. Would you like to pay now?',
           [
             {
-              text: 'View My Bookings',
+              text: 'Pay Later',
+              style:'cancel',
               onPress: () => router.push('/(tabs)/(drawer)/my_bookings'),
             },
             {
-              text: 'OK',
-              onPress: () => router.back(),
+              text: 'Pay Now',
+              onPress: () => router.push({
+                pathname:'/payment',
+                params:{
+                  bookingId: newBookingId,
+                  amount: total_amount
+                }
+              }),
             },
           ]
         );
-        await loadRideDetails();
+        //await loadRideDetails();
       }
     } catch (error: any) {
       Alert.alert(
