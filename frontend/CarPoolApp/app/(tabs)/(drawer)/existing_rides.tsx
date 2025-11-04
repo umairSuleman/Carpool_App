@@ -98,7 +98,7 @@ const ExistingRidesScreen = () => {
   const handleRidePress = (ride: Ride) => {
     // Navigate to ride details screen 
     router.push({
-      pathname: '/ride-details',
+      pathname: '/(tabs)/(drawer)/ride-details',
       params: { rideId: ride.id }
     });
   };
@@ -107,9 +107,11 @@ const ExistingRidesScreen = () => {
     const availableSeats = item.available_seats - item.booked_seats;
     
     // Safely get rating display value
-    const ratingDisplay = (item.driver.profile?.rating != null && typeof item.driver.profile.rating === 'number')
-      ? item.driver.profile.rating.toFixed(1) 
-      : 'New';
+    const ratingDisplay = (item.driver.profile?.rating != null)
+    ? (typeof item.driver.profile.rating === 'string' 
+        ? parseFloat(item.driver.profile.rating).toFixed(1)
+        : item.driver.profile.rating.toFixed(1))
+    : 'New';
     
     return (
       <TouchableOpacity 
