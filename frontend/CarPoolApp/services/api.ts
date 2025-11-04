@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://10.63.194.45:5000/api'; // Replace with your backend IP
+const API_URL = 'http://10.142.150.45:5000/api'; // Replace with your backend IP
 
 interface RegisterData {
   name: string;
