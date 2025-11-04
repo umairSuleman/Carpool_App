@@ -7,6 +7,7 @@ export default function RootLayout() {
       <Drawer.Screen name="home_screen" options={{ title: 'Home' }} />
       <Drawer.Screen name="existing_rides" options={{ title: 'Available Rides' }} />
       <Drawer.Screen name="my_bookings" options={{ title: 'My Bookings' }} />
+      <Drawer.Screen name="my_rides" options={{ title: 'My Rides (Driver)' }} />
       <Drawer.Screen name="new_ride" options={{ title: 'Create New Ride' }} />
       <Drawer.Screen name="about" options={{ title: 'About' }} />
       <Drawer.Screen name="user_profile" options={{ title: 'User Profile' }}/>
