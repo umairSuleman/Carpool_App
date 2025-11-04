@@ -1,19 +1,31 @@
+//backend/server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import sequelize from './config/database.js';
 import './models/associations.js'; // Import associations
+import { createServer } from 'http';
+
+//Import services
+import trackingService from './services/trackingService.js'
 
 // Import routes
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
 import rideRoutes from './routes/rides.js';
+import trackingRoutes from './routes/tracking.js';
+import bookingRoutes from './routes/bookings.js';
+import paymentRoutes from './routes/payment.js';
+import walletRoutes from './routes/wallet.js';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+//create HTTP server for Socket.IO
+const httpServer = createServer(app);
 
 // ============================================
 // MIDDLEWARE
@@ -40,6 +52,12 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ============================================
+// INITIALIZE SOCKET.IO
+// ============================================
+console.log('Initializing Socket.IO server...');
+trackingService.initialize(httpServer);
+
+// ============================================
 // ROUTES
 // ============================================
 
@@ -56,6 +74,10 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/rides', rideRoutes);
+app.use('/api/tracking', trackingRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/wallet', walletRoutes);
 // Add more routes here as you implement them:
 // app.use('/api/bookings', bookingRoutes);
 // app.use('/api/wallet', walletRoutes);
@@ -68,7 +90,17 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       auth: '/api/auth',
-      profile: '/api/profile'
+      profile: '/api/profile',
+      rides:'/api/rides',
+      tracking:'/api/tracking',
+      bookings:'/api/bookings',
+      payments:'/api/payments',
+      wallet:'/api/wallet'
+    },
+    features: {
+      realTimeTracking: true,
+      pushNotifications: true,
+      liveUpdates: true
     }
   });
 });
@@ -116,11 +148,12 @@ const startServer = async () => {
     
     console.log('3️⃣ Starting HTTP server...');
     // Start server
-    app.listen(PORT, '0.0.0.0', () => {
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 Server is running on port ${PORT}`);
       console.log(`📍 Local: http://localhost:${PORT}`);
       console.log(`📍 Network: http://0.0.0.0:${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
+      console.log(`📡 Socket.IO: Active and listening`);
       console.log('4️⃣ Server fully initialized and listening for requests');
     });
   } catch (error) {
@@ -145,28 +178,6 @@ process.on('uncaughtException', (err) => {
   console.error('Stack:', err?.stack);
   process.exit(1);
 });
-
-// Handle normal exit
-// process.on('exit', (code) => {
-//   console.log(`❌ Process exiting with code: ${code}`);
-// });
-
-// // Handle SIGTERM
-// process.on('SIGTERM', () => {
-//   console.log('❌ SIGTERM received');
-//   process.exit(0);
-// });
-
-// // Handle SIGINT (Ctrl+C)
-// process.on('SIGINT', () => {
-//   console.log('❌ SIGINT received');
-//   process.exit(0);
-// });
-
-// process.on('exit', (code) => {
-//   console.log(`❌ Process exiting with code: ${code}`);
-//   console.trace('Exit stack trace:'); // This will show you WHERE the exit is being called from
-// });
 
 // Start the server
 startServer();
