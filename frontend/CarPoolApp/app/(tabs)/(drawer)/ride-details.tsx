@@ -11,8 +11,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import RideService from '../../../services/rideService';
+import BookingService from '../../../services/bookingService';
+import ApiService from '../../../services/api';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
+/* -------------------- INTERFACES -------------------- */
 interface DriverProfile {
   rating: string | number | null;
   total_rides: number;
@@ -41,15 +44,15 @@ interface RideDetails {
   id: string;
   source_address: string;
   destination_address: string;
-  source_lat: number;
-  source_lng: number;
-  destination_lat: number;
-  destination_lng: number;
+  source_lat: string | number;
+  source_lng: string | number;
+  destination_lat: string | number;
+  destination_lng: string | number;
   departure_time: string;
   available_seats: number;
   booked_seats: number;
-  price_per_seat: number;
-  distance_km: number;
+  price_per_seat: string | number;
+  distance_km: string | number;
   duration_minutes: number;
   waypoints?: any[];
   driver: Driver;
@@ -63,76 +66,71 @@ interface RideDetails {
   }>;
 }
 
+/* -------------------- COMPONENT -------------------- */
 const RideDetailsScreen = () => {
-  const params = useLocalSearchParams();
-  const rideId = params.rideId as string;
+  const { rideId } = useLocalSearchParams();
   const router = useRouter();
   const [ride, setRide] = useState<RideDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [seatsToBook, setSeatsToBook] = useState(1);
+  const [isGuest, setIsGuest] = useState(true);
 
-  // const loadRideDetails = async () => {
-  //   try {
-  //     setLoading(true);
-  //     console.log('Fetching ride details for:', rideId);
-  //     const response = await RideService.getRideDetails(rideId);
-      
-  //     console.log('Ride details response:', response);
-      
-  //     if (response.success && response.ride) {
-  //       console.log('Driver info:', response.ride.driver); // ADD THIS
-  //       console.log('Driver profile:', response.ride.driver?.profile); // ADD THIS
-  //       console.log('Driver driverInfo:', response.ride.driver?.driverInfo); // ADD THIS
-  //       setRide(response.ride);
-  //     } else {
-  //       throw new Error('Invalid response format');
-  //     }
-  //   } catch (error: any) {
-  //     console.error('Error loading ride details:', error);
-  //     Alert.alert('Error', 'Failed to load ride details: ' + error.message);
-  //     router.back();
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+  /* -------------------- LOAD DATA -------------------- */
+  useEffect(() => {
+    checkAuthAndLoadRide();
+  }, [rideId]);
+
+  const checkAuthAndLoadRide = async () => {
+    try {
+      const isAuth = await ApiService.isAuthenticated();
+      setIsGuest(!isAuth);
+      if (rideId) await loadRideDetails();
+    } catch (error) {
+      console.error('Auth check failed:', error);
+    }
+  };
 
   const loadRideDetails = async () => {
     try {
       setLoading(true);
       console.log('Fetching ride details for:', rideId);
 
-      const response = await RideService.getRideDetails(rideId);
+      const response = await RideService.getRideDetails(rideId as string);
       console.log('Raw response:', JSON.stringify(response, null, 2));
 
-      if (!response || typeof response !== 'object') {
-        throw new Error('Unexpected response type');
-      }
-
-      if (response.success && response.ride) {
+      if (response?.success && response?.ride) {
         setRide(response.ride);
       } else {
-        throw new Error('Invalid response format: ' + JSON.stringify(response));
+        throw new Error('Invalid response format.');
       }
     } catch (error: any) {
-      console.error('Error loading ride details:', error.message);
-      Alert.alert('Error', error.message);
+      console.error('Error loading ride details:', error);
+      Alert.alert('Error', error.message || 'Failed to load ride details');
+      router.back();
     } finally {
       setLoading(false);
     }
   };
 
+  /* -------------------- SAFE ACCESSORS -------------------- */
+  const getDriverProfile = (): DriverProfile | null =>
+    ride?.driver?.profile || null;
 
-  useEffect(() => {
-    console.log('RideDetailsScreen mounted with rideId:', rideId);
-    if (rideId) {
-      loadRideDetails();
-    } else {
-      console.error('No rideId provided');
-      Alert.alert('Error', 'No ride ID provided');
-      router.back();
+  const getDriverInfo = (): DriverInfo | null =>
+    ride?.driver?.driverInfo || null;
+
+  const getRatingDisplay = (): string => {
+    const profile = getDriverProfile();
+    if (profile?.rating != null) {
+      const ratingValue =
+        typeof profile.rating === 'string'
+          ? parseFloat(profile.rating)
+          : profile.rating;
+      if (!isNaN(ratingValue)) return ratingValue.toFixed(1);
     }
-  }, [rideId]);
+    return 'New';
+  };
 
   const formatDate = (dateString: string) => {
     try {
@@ -145,23 +143,33 @@ const RideDetailsScreen = () => {
         hour: '2-digit',
         minute: '2-digit',
       });
-    } catch (error) {
+    } catch {
       return dateString;
     }
   };
 
+  /* -------------------- BOOKING HANDLERS -------------------- */
   const handleBookRide = () => {
+    if (isGuest) {
+      Alert.alert('Sign In Required', 'Please sign in to book a ride.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/login') },
+      ]);
+      return;
+    }
+
     if (!ride) return;
 
-    const availableSeats = ride.available_seats - ride.booked_seats;
-    
-    if (availableSeats === 0) {
-      Alert.alert('Fully Booked', 'This ride is fully booked');
+    const availableSeats =
+      (ride.available_seats ?? 0) - (ride.booked_seats ?? 0);
+
+    if (availableSeats <= 0) {
+      Alert.alert('Fully Booked', 'This ride is fully booked.');
       return;
     }
 
     if (seatsToBook > availableSeats) {
-      Alert.alert('Error', `Only ${availableSeats} seat(s) available`);
+      Alert.alert('Error', `Only ${availableSeats} seat(s) available.`);
       return;
     }
 
@@ -170,75 +178,69 @@ const RideDetailsScreen = () => {
 
     Alert.alert(
       'Confirm Booking',
-      `Book ${seatsToBook} seat(s) for ₹${totalAmount}?\n\nFrom: ${ride.source_address}\nTo: ${ride.destination_address}\nDate: ${formatDate(ride.departure_time)}`,
+      `Book ${seatsToBook} seat(s) for ₹${totalAmount}?\n\nFrom: ${
+        ride.source_address
+      }\nTo: ${ride.destination_address}\nDate: ${formatDate(
+        ride.departure_time
+      )}`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => processBooking(),
-        },
+        { text: 'Confirm', onPress: () => processBooking() },
       ]
     );
   };
 
   const processBooking = async () => {
+    if (!ride) return;
+
     setBooking(true);
-    
-    // Simulated booking - replace with actual API call
-    setTimeout(() => {
-      setBooking(false);
+    try {
+      const response = await BookingService.createBooking({
+        ride_id: ride.id,
+        seats_booked: seatsToBook,
+        pickup_location: ride.source_address,
+        dropoff_location: ride.destination_address,
+      });
+
+      if (response.success) {
+        Alert.alert(
+          'Booking Successful!',
+          'Your ride has been booked successfully.',
+          [
+            {
+              text: 'View My Bookings',
+              onPress: () => router.push('/(tabs)/(drawer)/my_bookings'),
+            },
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+        await loadRideDetails();
+      }
+    } catch (error: any) {
       Alert.alert(
-        'Booking Successful!',
-        'Your ride has been booked. The driver will contact you shortly.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
+        'Booking Failed',
+        error.message || 'Could not complete booking.'
       );
-    }, 1500);
+    } finally {
+      setBooking(false);
+    }
   };
 
+  /* -------------------- SEAT COUNTERS -------------------- */
   const incrementSeats = () => {
-    if (ride) {
-      const available = ride.available_seats - ride.booked_seats;
-      if (seatsToBook < available) {
-        setSeatsToBook(seatsToBook + 1);
-      }
-    }
+    const available =
+      (ride?.available_seats ?? 0) - (ride?.booked_seats ?? 0);
+    if (seatsToBook < available) setSeatsToBook(seatsToBook + 1);
   };
 
   const decrementSeats = () => {
-    if (seatsToBook > 1) {
-      setSeatsToBook(seatsToBook - 1);
-    }
+    if (seatsToBook > 1) setSeatsToBook(seatsToBook - 1);
   };
 
-  // Safe accessors
-  const getDriverProfile = (): DriverProfile | null => {
-    return ride?.driver?.profile || null;
-  };
-
-  const getDriverInfo = (): DriverInfo | null => {
-    return ride?.driver?.driverInfo || null;
-  };
-
-  const getRatingDisplay = (): string => {
-    const profile = getDriverProfile();
-    if (profile?.rating != null) {
-      // Handle both string and number ratings
-      const ratingValue = typeof profile.rating === 'string' 
-        ? parseFloat(profile.rating) 
-        : profile.rating;
-      
-      if (!isNaN(ratingValue)) {
-        return ratingValue.toFixed(1);
-      }
-    }
-    return 'New';
-  };
-
+  /* -------------------- CONDITIONAL RENDER -------------------- */
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -255,8 +257,8 @@ const RideDetailsScreen = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>Ride not found</Text>
-          <TouchableOpacity 
-            style={styles.backButton} 
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={() => router.canGoBack() && router.back()}
           >
             <Text style={styles.backButtonText}>Go Back</Text>
@@ -266,24 +268,26 @@ const RideDetailsScreen = () => {
     );
   }
 
-  const sourceLat= Number(ride.source_lat);
+  /* -------------------- MAP SAFE VALUES -------------------- */
+  const sourceLat = Number(ride.source_lat);
   const sourceLng = Number(ride.source_lng);
   const destLat = Number(ride.destination_lat);
   const destLng = Number(ride.destination_lng);
-  
-  const availableSeats = (ride.available_seats ?? 0) - (ride.booked_seats ?? 0);
-  const pricePerSeat = parseFloat(ride.price_per_seat?.toString() ?? "0");
+
+  const availableSeats =
+    (ride.available_seats ?? 0) - (ride.booked_seats ?? 0);
+  const pricePerSeat = parseFloat(ride.price_per_seat?.toString() ?? '0');
   const totalAmount = pricePerSeat * seatsToBook;
-  
-  // Safely get rating display value
+
   const driverProfile = getDriverProfile();
   const driverInfo = getDriverInfo();
-  const ratingDisplay = getRatingDisplay?.() ?? "N/A";
+  const ratingDisplay = getRatingDisplay();
 
+  /* -------------------- UI -------------------- */
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
-        {/* Map - Only render if coordinates are valid */}
+        {/* Map */}
         {!isNaN(sourceLat) && !isNaN(sourceLng) && (
           <View style={styles.mapContainer}>
             <MapView
@@ -297,19 +301,13 @@ const RideDetailsScreen = () => {
               }}
             >
               <Marker
-                coordinate={{
-                  latitude: sourceLat,
-                  longitude: sourceLng,
-                }}
+                coordinate={{ latitude: sourceLat, longitude: sourceLng }}
                 title="Pickup"
                 pinColor="green"
               />
               {!isNaN(destLat) && !isNaN(destLng) && (
                 <Marker
-                  coordinate={{
-                    latitude: destLat,
-                    longitude: destLng,
-                  }}
+                  coordinate={{ latitude: destLat, longitude: destLng }}
                   title="Drop-off"
                   pinColor="red"
                 />
@@ -318,33 +316,14 @@ const RideDetailsScreen = () => {
           </View>
         )}
 
-        {/* Route Info */}
-        <View style={styles.section}>
-          <View style={styles.routeInfo}>
-            <View style={styles.locationContainer}>
-                <View style={[styles.locationDot, { backgroundColor: '#34C759' }]} />
-                <Text style={styles.locationText} numberOfLines={2}>
-                    {ride.source_address ?? "Unknown source"}
-                </Text>
-            </View>
-            <View style={styles.routeLine} />
-            <View style={styles.locationContainer}>
-                <View style={[styles.locationDot, { backgroundColor: '#FF3B30' }]} />
-                <Text style={styles.locationText} numberOfLines={2}>
-                    {ride.destination_address ?? "Unknown Destination"}
-                </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Trip Details */}
+        {/* Trip Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trip Details</Text>
           <View style={styles.detailsGrid}>
             <View style={styles.detailCard}>
               <Text style={styles.detailLabel}>Departure</Text>
               <Text style={styles.detailValue}>
-                {ride.departure_time ? formatDate(ride.departure_time) : "N/A"}
+                {ride.departure_time ? formatDate(ride.departure_time) : 'N/A'}
               </Text>
             </View>
             <View style={styles.detailCard}>
@@ -354,16 +333,23 @@ const RideDetailsScreen = () => {
                   ? `${Math.floor(ride.duration_minutes / 60)}h ${
                       ride.duration_minutes % 60
                     }m`
-                  : "N/A"}
+                  : 'N/A'}
               </Text>
             </View>
             <View style={styles.detailCard}>
               <Text style={styles.detailLabel}>Distance</Text>
-              <Text style={styles.detailValue}>{ride.distance_km ? `${ride.distance_km} km` : "N/A"} km</Text>
+              <Text style={styles.detailValue}>
+                {ride.distance_km ? `${ride.distance_km} km` : 'N/A'}
+              </Text>
             </View>
             <View style={styles.detailCard}>
               <Text style={styles.detailLabel}>Available</Text>
-              <Text style={[styles.detailValue, availableSeats === 0 && styles.fullSeats]}>
+              <Text
+                style={[
+                  styles.detailValue,
+                  availableSeats === 0 && styles.fullSeats,
+                ]}
+              >
                 {availableSeats} / {ride.available_seats}
               </Text>
             </View>
@@ -376,106 +362,57 @@ const RideDetailsScreen = () => {
           <View style={styles.driverCard}>
             <View style={styles.driverAvatar}>
               <Text style={styles.driverInitial}>
-                {ride.driver?.name?.charAt(0)?.toUpperCase() ?? "?"}
+                {ride.driver?.name?.charAt(0)?.toUpperCase() ?? '?'}
               </Text>
             </View>
             <View style={styles.driverInfo}>
-              <Text style={styles.driverName}>{ride?.driver?.name ?? "Unknown"}</Text>
+              <Text style={styles.driverName}>
+                {ride.driver?.name ?? 'Unknown'}
+              </Text>
               {driverProfile && (
                 <View style={styles.ratingRow}>
-                  <Text style={styles.rating}>
-                    ⭐ {ratingDisplay}
-                  </Text>
+                  <Text style={styles.rating}>⭐ {ratingDisplay}</Text>
                   <Text style={styles.totalRides}>
                     • {driverProfile.total_rides ?? 0} rides
                   </Text>
                 </View>
               )}
-              {getDriverInfo() && (
+              {driverInfo && (
                 <Text style={styles.vehicleInfo}>
-                  {getDriverInfo()!.vehicle_model} • {getDriverInfo()!.vehicle_color}
+                  {driverInfo.vehicle_model} • {driverInfo.vehicle_color}
                 </Text>
               )}
             </View>
           </View>
 
           {/* Preferences */}
-          {getDriverProfile() && (
+          {driverProfile && (
             <View style={styles.preferencesContainer}>
               <Text style={styles.preferencesTitle}>Preferences</Text>
               <View style={styles.preferencesGrid}>
-                <View style={styles.preferenceItem}>
-                  <Text style={styles.preferenceIcon}>
-                    {getDriverProfile()!.smoking ? '🚬' : '🚭'}
-                  </Text>
-                  <Text style={styles.preferenceText}>
-                    {getDriverProfile()!.smoking ? 'Smoking OK' : 'No Smoking'}
-                  </Text>
-                </View>
-                <View style={styles.preferenceItem}>
-                  <Text style={styles.preferenceIcon}>
-                    {getDriverProfile()!.pets ? '🐕' : '🚫🐕'}
-                  </Text>
-                  <Text style={styles.preferenceText}>
-                    {getDriverProfile()!.pets ? 'Pets OK' : 'No Pets'}
-                  </Text>
-                </View>
-                <View style={styles.preferenceItem}>
-                  <Text style={styles.preferenceIcon}>
-                    {getDriverProfile()!.music ? '🎵' : '🔇'}
-                  </Text>
-                  <Text style={styles.preferenceText}>
-                    {getDriverProfile()!.music ? 'Music' : 'Quiet'}
-                  </Text>
-                </View>
-                <View style={styles.preferenceItem}>
-                  <Text style={styles.preferenceIcon}>
-                    {getDriverProfile()!.chatty ? '💬' : '🤫'}
-                  </Text>
-                  <Text style={styles.preferenceText}>
-                    {getDriverProfile()!.chatty ? 'Chatty' : 'Quiet Ride'}
-                  </Text>
-                </View>
+                <Preference
+                  icon={driverProfile.smoking ? '🚬' : '🚭'}
+                  text={driverProfile.smoking ? 'Smoking OK' : 'No Smoking'}
+                />
+                <Preference
+                  icon={driverProfile.pets ? '🐕' : '🚫🐕'}
+                  text={driverProfile.pets ? 'Pets OK' : 'No Pets'}
+                />
+                <Preference
+                  icon={driverProfile.music ? '🎵' : '🔇'}
+                  text={driverProfile.music ? 'Music' : 'Quiet'}
+                />
+                <Preference
+                  icon={driverProfile.chatty ? '💬' : '🤫'}
+                  text={driverProfile.chatty ? 'Chatty' : 'Quiet Ride'}
+                />
               </View>
             </View>
           )}
         </View>
-
-        {/* Booking Section */}
-        {availableSeats > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Book Your Ride</Text>
-            <View style={styles.bookingCard}>
-              <View style={styles.seatsSelector}>
-                <Text style={styles.seatsSelectorLabel}>Number of seats:</Text>
-                <View style={styles.seatsControls}>
-                  <TouchableOpacity
-                    style={styles.seatsButton}
-                    onPress={decrementSeats}
-                    disabled={seatsToBook <= 1}
-                  >
-                    <Text style={styles.seatsButtonText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.seatsValue}>{seatsToBook}</Text>
-                  <TouchableOpacity
-                    style={styles.seatsButton}
-                    onPress={incrementSeats}
-                    disabled={seatsToBook >= availableSeats}
-                  >
-                    <Text style={styles.seatsButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Total Amount:</Text>
-                <Text style={styles.priceValue}>₹{totalAmount}</Text>
-              </View>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Bottom Action Button */}
+      {/* Bottom Booking Bar */}
       <View style={styles.bottomBar}>
         {availableSeats > 0 ? (
           <TouchableOpacity
@@ -486,7 +423,11 @@ const RideDetailsScreen = () => {
             {booking ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.bookButtonText}>Book Ride - ₹{totalAmount}</Text>
+              <Text style={styles.bookButtonText}>
+                {isGuest
+                  ? 'Sign In to Book'
+                  : `Book Ride - ₹${totalAmount}`}
+              </Text>
             )}
           </TouchableOpacity>
         ) : (
@@ -499,8 +440,23 @@ const RideDetailsScreen = () => {
   );
 };
 
+/* -------------------- SMALL COMPONENT -------------------- */
+const Preference = ({
+  icon,
+  text,
+}: {
+  icon: string;
+  text: string;
+}) => (
+  <View style={styles.preferenceItem}>
+    <Text style={styles.preferenceIcon}>{icon}</Text>
+    <Text style={styles.preferenceText}>{text}</Text>
+  </View>
+);
+
 export default RideDetailsScreen;
 
+/* -------------------- STYLES -------------------- */
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -509,11 +465,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  backButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  backButtonText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: '600' 
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
     marginTop: 10,
@@ -523,18 +489,6 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 18,
     color: '#FF3B30',
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   mapContainer: {
     height: 200,
@@ -763,17 +717,5 @@ const styles = StyleSheet.create({
   fullyBookedText: {
     fontSize: 16,
     color: '#666',
-  },
-  trackButton: {
-    backgroundColor: '#34C759',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  trackButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
