@@ -183,6 +183,13 @@ class TrackingService {
 
     console.log(`[Simulation] Starting for ride ${rideId}`);
 
+    let cords=[];
+    try{
+
+    }
+    catch{
+      
+    }
     // 1. Get the route polyline from Google Maps
     const routeDetails = await googleMapsService.getRouteDetails(
       { lat: ride.source_lat, lng: ride.source_lng },
