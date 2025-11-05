@@ -1,7 +1,9 @@
 //backend/server.js
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+
 import sequelize from './config/database.js';
 import './models/associations.js'; // Import associations
 import { createServer } from 'http';
@@ -19,7 +21,7 @@ import paymentRoutes from './routes/payment.js';
 import walletRoutes from './routes/wallet.js';
 
 // Load environment variables
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -2,10 +2,62 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import trackingService from '../services/trackingService.js';
-import googleMapsService from '../services/googleMapsService.js'; // <-- IMPORTED
+import googleMapsService from '../services/googleMapsService.js';
 import { Ride, Booking, User } from '../models/associations.js';
 
 const router = express.Router();
+
+/**
+ * IMPORTANT: Static routes MUST come before parameterized routes
+ * Otherwise Express will try to match 'navigation' as a :rideId
+ */
+
+/**
+ * Get navigation route (NO authentication needed)
+ * POST /api/tracking/navigation
+ */
+router.post('/navigation', async (req, res) => {
+  try {
+    const { origin, destination, waypoints } = req.body;
+
+    console.log('[Navigation] Request received:', { origin, destination, waypoints });
+
+    if (!origin || !destination) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Origin and destination are required' 
+      });
+    }
+
+    // Call Google Maps service
+    const routeDetails = await googleMapsService.getRouteDetails(
+      origin,
+      destination,
+      waypoints || []
+    );
+
+    if (!routeDetails.success) {
+      console.error('[Navigation] Route calculation failed:', routeDetails.error);
+      return res.status(400).json({
+        success: false,
+        error: routeDetails.error || 'Failed to calculate route'
+      });
+    }
+
+    console.log('[Navigation] Route calculated successfully');
+    res.json({
+      success: true,
+      route: routeDetails
+    });
+    
+  } catch (error) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get navigation'
+    });
+  }
+});
 
 /**
  * Get driver's current location for a ride
@@ -21,7 +73,7 @@ router.get('/:rideId/location', authenticate, async (req, res) => {
         model: Booking,
         as: 'bookings',
         where: { booking_status: 'confirmed' },
-        required: false   //alows rides with no bookings
+        required: false
       }]
     });
 
@@ -47,7 +99,7 @@ router.get('/:rideId/location', authenticate, async (req, res) => {
 
     res.json({
       success: true,
-      location: locationData ? locationData.location : null, // Send only location object
+      location: locationData ? locationData.location : null,
       isActive: trackingService.isDriverActive(rideId)
     });
   } catch (error) {
@@ -113,7 +165,6 @@ router.get('/:rideId/participants', authenticate, async (req, res) => {
         ...b.passenger.toJSON(),
         seats_booked: b.seats_booked
       })),
-      // Also send ride coords for map
       source: {
         latitude: ride.source_lat,
         longitude: ride.source_lng
@@ -122,54 +173,13 @@ router.get('/:rideId/participants', authenticate, async (req, res) => {
         latitude: ride.destination_lat,
         longitude: ride.destination_lng
       },
-      waypoints: ride.waypoints || []  //ENSURE THAT IT IS ALWAYS AN ARRAY
+      waypoints: ride.waypoints || []
     });
   } catch (error) {
     console.error('Error getting participants:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get participants'
-    });
-  }
-});
-
-/**
- * Get navigation route
- * POST /api/tracking/navigation
- */
-router.post('/navigation', authenticate, async (req, res) => {
-  try {
-    const { origin, destination, waypoints } = req.body;
-
-    if (!origin || !destination) {
-      return res.status(400).json({ success: false, error: 'Origin and destination are required' });
-    }
-
-    // --- UPDATED ---
-    // Call the real Google Maps service
-    const routeDetails = await googleMapsService.getRouteDetails(
-      origin,
-      destination,
-      waypoints || []
-    );
-
-    if (!routeDetails.success) {
-      return res.status(400).json({
-        success: false,
-        error: routeDetails.error || 'Failed to calculate route'
-      });
-    }
-
-    res.json({
-      success: true,
-      route: routeDetails // Send the full route details
-    });
-    
-  } catch (error) {
-    console.error('Error getting navigation:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get navigation'
     });
   }
 });

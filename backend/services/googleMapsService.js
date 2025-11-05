@@ -1,9 +1,32 @@
 import axios from 'axios';
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// load .env from backend folder (one level above services)
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+console.log("🧩 .env loaded from:", path.resolve(__dirname, "../.env"));
+console.log("🔑 GOOGLE_MAPS_API_KEY:", process.env.GOOGLE_MAPS_API_KEY ? "✅ Exists" : "❌ Missing");
 
 class GoogleMapsService {
   constructor() {
+    console.log('🔍 Loading Google Maps API Key...');
+    console.log('🔍 process.env.GOOGLE_MAPS_API_KEY:', process.env.GOOGLE_MAPS_API_KEY ? 'EXISTS (length: ' + process.env.GOOGLE_MAPS_API_KEY.length + ')' : 'UNDEFINED');
+    
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY;
     this.baseUrl = 'https://maps.googleapis.com/maps/api';
+    
+    if (!this.apiKey) {
+      console.error('❌ GOOGLE_MAPS_API_KEY is not set!');
+    } else {
+      console.log('✅ Google Maps API key loaded successfully');
+      console.log('🔑 Key starts with:', this.apiKey.substring(0, 10) + '...');
+    }
   }
 
   /**
@@ -47,6 +70,39 @@ class GoogleMapsService {
    */
   async getRouteDetails(origin, destination, waypoints = []) {
     try {
+
+      // Format origin/destination - handle both string and object formats
+      let originParam;
+      let destinationParam;
+
+      if (typeof origin === 'string') {
+        originParam = origin;
+      } else if (origin && typeof origin === 'object') {
+        // Ensure we have numbers, not strings
+        const lat = parseFloat(origin.lat);
+        const lng = parseFloat(origin.lng);
+        if (isNaN(lat) || isNaN(lng)) {
+          throw new Error('Invalid origin coordinates');
+        }
+        originParam = `${lat},${lng}`;
+      } else {
+        throw new Error('Invalid origin format');
+      }
+      
+      if (typeof destination === 'string') {
+        destinationParam = destination;
+      } else if (destination && typeof destination === 'object') {
+        // Ensure we have numbers, not strings
+        const lat = parseFloat(destination.lat);
+        const lng = parseFloat(destination.lng);
+        if (isNaN(lat) || isNaN(lng)) {
+          throw new Error('Invalid destination coordinates');
+        }
+        destinationParam = `${lat},${lng}`;
+      } else {
+        throw new Error('Invalid destination format');
+      }
+
       const params = {
         origin: typeof origin === 'string' ? origin : `${origin.lat},${origin.lng}`,
         destination: typeof destination === 'string' ? destination : `${destination.lat},${destination.lng}`,
@@ -59,6 +115,8 @@ class GoogleMapsService {
           typeof wp === 'string' ? wp : `${wp.lat},${wp.lng}`
         ).join('|');
       }
+
+      console.log('[Google Maps] Requesting directions with params:', params);
 
       const response = await axios.get(`${this.baseUrl}/directions/json`, {
         params

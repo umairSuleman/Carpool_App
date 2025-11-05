@@ -142,9 +142,15 @@ const LiveTrackingScreen = () => {
     try {
 
       // --- THIS IS THE FIX ---
-      // Re-map keys from { latitude, longitude } to { lat, lng }
-      const originFormatted = { lat: origin.latitude, lng: origin.longitude };
-      const destFormatted = { lat: destination.latitude, lng: destination.longitude };
+      // Parse coordinates to numbers (they come as strings from DB)
+      const originFormatted = { 
+        lat: parseFloat(origin.latitude), 
+        lng: parseFloat(origin.longitude) 
+      };
+      const destFormatted = { 
+        lat: parseFloat(destination.latitude), 
+        lng: parseFloat(destination.longitude) 
+      };
 
       // Ensure waypoints is an array before mapping
       const waypointAddresses = Array.isArray(waypoints) ? waypoints.map(wp => wp.address) : [];
